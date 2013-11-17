@@ -12,7 +12,7 @@ class CsvCleaner:
         self.sentence = re.compile("(.*[\.])*?[\.!?]")
         self.any_tag = re.compile("</(.*?)>")
         self.tags_found = []
-        self.tags_to_remove = re.compile("<.*?>")
+        self.tags_to_remove = [(re.compile("<.*?>"), ""), (re.compile("\{.*?\}"), ""), (re.compile("[^a-zA-Z0-9 ]"), " ")]
         #self.tags = ['p', 'code', 'pre', 'a', 'li', 'ol', 'em', 'strong', 'blockquote']
 
         #self.tags_to_remove = ['h1', 'ul', 'h2', 'b', 'h3', 'strike', 'i', 'kbd', 'PRE', 'sup']
@@ -21,9 +21,17 @@ class CsvCleaner:
         #self.compiled_tags_remove = [re.compile("<%s(?:\s.*?)*?>(.*?)</%s>" % (tag, tag)) for tag in self.tags_to_remove]
 
     def get_final_string(self, string_list):
-        final_string = " ".join(string_list)
-        final_string = re.sub(self.tags_to_remove,"", final_string)
+        if isinstance(string_list, list):
+            string_list_modified = [element for element in string_list if element != '' and element != ' ']
+            final_string = " ".join(string_list_modified)
+            final_string = final_string.strip(' \t\n\r')
+        else:
+            final_string = string_list.strip(' \t\n\r')
+        for remove_re in self.tags_to_remove:
+            final_string = re.sub(remove_re[0], remove_re[1], final_string)
         return final_string
+
+
 
     def process(self, text):
         """
@@ -39,11 +47,15 @@ class CsvCleaner:
         code_list = self.code.findall(new_text)
         new_text = re.sub(self.code, "", new_text)
         pre_list = self.pre.findall(new_text)
-        code_string = " ".join(code_list)
-        pre_string = " ".join(pre_list)
+        code_string = self.get_final_string(code_list)
+        pre_string = self.get_final_string(pre_list)
         li_string = self.get_final_string(li_list)
         p_string = self.get_final_string(p_list)
-        return [code_string, p_string, p_string+code_string+li_string+pre_string, li_string, text]
+        final_string = p_string+" "+code_string+" "+li_string+" "+pre_string
+        print text
+        print final_string
+        #final_string = re.sub()
+        return final_string
 
     def tag_detected(self, tag, text):
         if tag in text:
@@ -63,7 +75,7 @@ class CsvCleaner:
         end_reading = end if end is not None else -1
         current_line = 0
 
-        a = [0,0,0,0,0,0,0,0]
+        a = [0,0,0,0,0,0]
         b = [0,0,0]
         for line in csv_reader:
             current_line += 1
@@ -72,37 +84,28 @@ class CsvCleaner:
             if current_line > end_reading:
                 if end_reading != -1:
                     break
-            [q_id, title, body, tags] = line
+            [_, title, body, tags] = line
             tags = tags.split(" ")
             a[-1] += len(tags)
             body = body.lower()
             processed_body = self.process(body)
-            b[0] += len(processed_body[1])
-            b[1] += len(processed_body[2])
-            b[2] += len(body)
-            [code_list, p_list, complete, li, text] = processed_body
-            for index, element in enumerate(processed_body):
-                for tag in tags:
-                    if self.tag_detected(tag,element):
-                        a[index+1] += 1
-
+            b[0] += len(processed_body)
+            b[1] += len(body)
             for tag in tags:
-                if self.tag_detected(tag,processed_body[0]) and not self.tag_detected(tag,processed_body[1]):
-                    print tag
-
-            for tag in tags:
-                if self.tag_detected(tag, text) and not self.tag_detected(tag, complete):
-                    print text
-                    print complete
-                    print tag
+                if self.tag_detected(tag, body):
+                    a[2] += 1
+                    if self.tag_detected(tag, processed_body):
+                        a[1] += 1
+                    else:
+                        pass#print processed_body
 
             for tag in tags:
                 if self.tag_detected(tag, title):
                     a[0] += 1
-                if self.tag_detected(tag,title+processed_body[-1]):
+                if self.tag_detected(tag, title+processed_body):
                     a[-2] += 1
         print a
         print b
 if __name__ == "__main__":
     cc = CsvCleaner("Train.csv")
-    cc.clean(end=40000)
+    cc.clean(end=10000)
