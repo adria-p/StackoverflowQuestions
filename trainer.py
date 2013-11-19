@@ -80,7 +80,7 @@ class Trainer:
             return cPickle.load(f), cPickle.load(f2)
         if self.stage > 3:
             return None, None
-        num_tags = len(Y.data)
+        num_tags = len(Y.data)*(1+self.proportion)
         offset = X.shape[1]
         random_range = Y.shape[1]
         targets = np.zeros(num_tags)
@@ -109,7 +109,7 @@ class Trainer:
                 current_row += 1
             print current_row
         training = self.build_matrix((new_data, new_indices, new_indptr),
-                               (num_tags*(self.proportion+1), Y.shape[1]+X.shape[1]))
+                                     (num_tags, Y.shape[1]+X.shape[1]))
         targets = np.array(targets)
         f = open(self.data_final_train,'wb')
         cPickle.dump(training, f)
@@ -120,12 +120,13 @@ class Trainer:
         return training, targets
 
     def shuffle_sparse_matrices(self, start, stop, matrix1, matrix2):
-        indices = np.arange(start, stop)
+        indices = np.arange(start, stop, dtype=np.int32)
         np.random.shuffle(indices)
-        return matrix1[indices, :], matrix2[indices, :]
-
+        return matrix1[indices, :], matrix2[indices]
 
     def get_sliced_shuffled_data(self, X, Z):
+        if self.stage >= 4:
+            pass
         fractions = [0.5, 0.75]
         train_end = round(fractions[0]*X.shape[0])
         val_end = round(fractions[1]*X.shape[0])
