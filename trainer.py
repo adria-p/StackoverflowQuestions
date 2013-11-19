@@ -1,4 +1,4 @@
-
+from scipy.sparse import csr_matrix
 
 __author__ = 'apuigdom'
 
@@ -8,7 +8,6 @@ from csvCleaner import CsvCleaner
 from sklearn.feature_extraction.text import TfidfVectorizer, CountVectorizer
 from sklearn.externals import joblib
 from scipy.sparse.construct import hstack
-from scipy.sparse.csgraph._min_spanning_tree import csr_matrix
 import cPickle
 import string
 import numpy as np
@@ -34,8 +33,12 @@ class Trainer:
         self.target_final_train = targets_prefix+final_train_suffix
 
     def get_raw_data(self):
-        X = CsvCleaner(self.raw_data_file, detector_mode=False, report_every=10000, end=30000, only_tags=False)
-        Y = CsvCleaner(self.raw_data_file, detector_mode=False, report_every=10000, end=30000, only_tags=True)
+        X = CsvCleaner(self.raw_data_file, detector_mode=False,
+                       report_every=10000, end=self.num_examples,
+                       only_tags=False)
+        Y = CsvCleaner(self.raw_data_file, detector_mode=False,
+                       report_every=10000, end=self.num_examples,
+                       only_tags=True)
         return X, Y
 
     def get_preprocessors(self):
@@ -71,10 +74,12 @@ class Trainer:
         return transformed_X, transformed_Y
 
     def get_final_training_data(self, X, Y):
-        if self.stage > 3:
+        if self.stage == 3:
             f = open(self.data_final_train, "rb")
             f2 = open(self.target_final_train, "rb")
             return cPickle.load(f), cPickle.load(f2)
+        if self.stage > 3:
+            return None, None
         num_tags = len(Y.data)
         offset = X.shape[1]
         random_range = Y.shape[1]
@@ -103,21 +108,45 @@ class Trainer:
                 new_indptr.append(last_indptr)
                 current_row += 1
             print current_row
-        ts = self.build_matrix((new_data, new_indices, new_indptr),(num_tags*(self.proportion+1), Y.shape[1]+X.shape[1]))
-        return ts, targets
+        training = self.build_matrix((new_data, new_indices, new_indptr),
+                               (num_tags*(self.proportion+1), Y.shape[1]+X.shape[1]))
+        targets = np.array(targets)
+        f = open(self.data_final_train,'wb')
+        cPickle.dump(training, f)
+        f.close()
+        f = open(self.target_final_train,'wb')
+        cPickle.dump(targets, f)
+        f.close()
+        return training, targets
+
+    def shuffle_sparse_matrices(self, start, stop, matrix1, matrix2):
+        indices = np.arange(start, stop)
+        np.random.shuffle(indices)
+        return matrix1[indices, :], matrix2[indices, :]
+
+
+    def get_sliced_shuffled_data(self, X, Z):
+        fractions = [0.5, 0.75]
+        train_end = round(fractions[0]*X.shape[0])
+        val_end = round(fractions[1]*X.shape[0])
+        new_X, new_Z = self.shuffle_sparse_matrices(0, train_end, X, Z)
+        VX, VZ = self.shuffle_sparse_matrices(train_end, val_end, X, Z)
+        TX, TZ = self.shuffle_sparse_matrices(val_end, X.shape[0], X, Z)
+        return new_X, VX, TX, Z, VZ, TZ
 
     def build_matrix(self, info, shape):
-        training_sparse = csr_matrix(info, shape=shape)
+        training_sparse = csr_matrix(info, shape=shape, dtype=np.float64)
         return training_sparse
+
 
     def run(self):
         tfidf, cv = self.get_preprocessors()
         X, Y = self.get_data(tfidf, cv)
         X, Z = self.get_final_training_data(X, Y)
-        print X
-        print Z
+        X, VX, TX, Z, VZ, TZ = self.get_sliced_shuffled_data(X, Z)
+        print "Hey"
 
 
 if __name__ == "__main__":
-    trainer = Trainer(stage=0)
+    trainer = Trainer(stage=0, num_examples=30)
     trainer.run()
