@@ -1,16 +1,14 @@
-from scipy.sparse import csr_matrix
-
-__author__ = 'apuigdom'
-
-
 __author__ = 'kosklain'
+
+from neuralTrainer import NeuralTrainer
 from csvCleaner import CsvCleaner
 from sklearn.feature_extraction.text import TfidfVectorizer, CountVectorizer
 from sklearn.externals import joblib
-from scipy.sparse.construct import hstack
 import cPickle
 import string
 import numpy as np
+from scipy.sparse import csr_matrix
+
 
 class Trainer:
     def __init__(self, stage=0, preprocessor_suffix="preprocess.pkl",
@@ -55,7 +53,7 @@ class Trainer:
         joblib.dump(cv, self.labels_preprocessor)
         return tfidf, cv
 
-    def get_data(self, tfidf, cv):
+    def get_transfomed_data(self, tfidf, cv):
         if self.stage == 2:
             f = open(self.data_processed, "rb")
             f2 = open(self.labels_processed, "rb")
@@ -65,11 +63,11 @@ class Trainer:
         X, Y = self.get_raw_data()
         transformed_X = tfidf.transform(X)
         transformed_Y = cv.transform(Y)
-        f = open(self.data_processed,'wb')
-        cPickle.dump(transformed_X,f)
+        f = open(self.data_processed, 'wb')
+        cPickle.dump(transformed_X, f)
         f.close()
-        f = open(self.labels_processed,'wb')
-        cPickle.dump(transformed_Y,f)
+        f = open(self.labels_processed, 'wb')
+        cPickle.dump(transformed_Y, f)
         f.close()
         return transformed_X, transformed_Y
 
@@ -90,9 +88,10 @@ class Trainer:
         new_indptr = [0]
         last_indptr = 0
         np.random.seed(67)
-        for x, y in zip(X,Y):
+        for x, y in zip(X, Y):
             _, true_labels = y.nonzero()
-            random_labels = np.random.randint(random_range - len(true_labels), size=self.proportion*len(true_labels))
+            random_labels = np.random.randint(random_range - len(true_labels),
+                                              size=self.proportion*len(true_labels))
             for label in true_labels:
                 random_labels[random_labels >= label] += 1
             labels = np.concatenate((true_labels, random_labels))
@@ -107,10 +106,9 @@ class Trainer:
                 last_indptr += indptr_to_add
                 new_indptr.append(last_indptr)
                 current_row += 1
-            print current_row
         training = self.build_matrix((new_data, new_indices, new_indptr),
                                      (num_tags, Y.shape[1]+X.shape[1]))
-        targets = np.array(targets)
+        targets = targets.reshape(targets.shape[0], 1)
         f = open(self.data_final_train,'wb')
         cPickle.dump(training, f)
         f.close()
@@ -133,20 +131,34 @@ class Trainer:
         new_X, new_Z = self.shuffle_sparse_matrices(0, train_end, X, Z)
         VX, VZ = self.shuffle_sparse_matrices(train_end, val_end, X, Z)
         TX, TZ = self.shuffle_sparse_matrices(val_end, X.shape[0], X, Z)
-        return new_X, VX, TX, Z, VZ, TZ
+        return new_X, VX, TX, new_Z, VZ, TZ
 
     def build_matrix(self, info, shape):
         training_sparse = csr_matrix(info, shape=shape, dtype=np.float64)
         return training_sparse
 
 
+    def get_projection_matrix(self, in_dim, out_dim):
+        # Probaiblity of  {-1,1} is 1/sqrt(in_dim)
+        probability = 2*np.sqrt(in_dim)
+        np.random.seed(15)
+        P = np.random.randint(probability, size=(in_dim*out_dim)).reshape((in_dim, out_dim))
+        P[P > 2] = 1
+        P -= 1
+        return P
+
+    def get_projected_data(self, X, Z):
+        P = self.get_projection_matrix(X.shape[1], 4000)
+        return X.dot(P), Z
+
     def run(self):
         tfidf, cv = self.get_preprocessors()
-        X, Y = self.get_data(tfidf, cv)
+        X, Y = self.get_transfomed_data(tfidf, cv)
         X, Z = self.get_final_training_data(X, Y)
+        X, Z = self.get_projected_data(X, Z)
         X, VX, TX, Z, VZ, TZ = self.get_sliced_shuffled_data(X, Z)
-        print "Hey"
-
+        nt = NeuralTrainer(X, VX, Z, VZ, TX, TZ)
+        nt.run()
 
 if __name__ == "__main__":
     trainer = Trainer(stage=0, num_examples=30)
