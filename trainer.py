@@ -10,7 +10,7 @@ import cPickle
 import string
 import numpy as np
 from scipy.sparse import csr_matrix
-
+import time
 
 class Trainer:
     def __init__(self, stage=0, preprocessor_suffix="preprocess.pkl",
@@ -183,19 +183,39 @@ class Trainer:
         return X.dot(P)
 
     def run(self):
+	print "Num examples: "+str(self.num_examples)
+	actual_time = time.time()
         tfidf, cv = self.get_preprocessors()
+	new_time = time.time()
+	print "Time spent in building the preprocessors: "+str(new_time-actual_time)
+	actual_time = new_time
         X, Z = self.get_transfomed_data(tfidf, cv)
-        val_end = round(self.fractions[1]*X.shape[0])
+        new_time = time.time()
+        print "Time spent in transforming the data: "+str(new_time-actual_time)
+        actual_time = new_time
+	val_end = round(self.fractions[1]*X.shape[0])
         TX = X[val_end:]
-        TZ = Z[val_end:]
         X = X[:val_end]
+	TZ = Z[val_end:]
         Z = Z[:val_end]
         X, Z = self.get_final_training_data(X, Z)
-        X = self.get_projected_data(X)
+	new_time = time.time()
+        print "Time spent in preparing the data: "+str(new_time-actual_time)
+        actual_time = new_time
+        #X = self.get_projected_data(X)
         X, VX, Z, VZ = self.get_sliced_shuffled_data(X, Z)
+	new_time = time.time()
+        print "Time spent in slicing and shuffling: "+str(new_time-actual_time)
+        actual_time = new_time
         model = LogisticRegression()
         model.fit(X, Z)
+	new_time = time.time()
+        print "Time spent in training: "+str(new_time-actual_time)
+        actual_time = new_time
         predictions = model.predict(VX)
+	new_time = time.time()
+        print "Time spent in predicting: "+str(new_time-actual_time)
+        actual_time = new_time
         final_score = 0
         for pred, gt in zip(predictions, VZ):
             if pred == gt:
@@ -211,5 +231,5 @@ class Trainer:
 
 
 if __name__ == "__main__":
-    trainer = Trainer(stage=0, num_examples=30000)
+    trainer = Trainer(stage=2, num_examples=3000000)
     trainer.run()
