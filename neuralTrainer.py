@@ -11,13 +11,11 @@ __author__ = 'kosklain'
 
 class NeuralTrainer(object):
 
-    def __init__(self, X, VX, Z, VZ, TX=None, TZ=None):
+    def __init__(self, X, VX, Z, VZ):
         self.X = X
         self.VX = VX
         self.Z = Z
         self.VZ = VZ
-        self.TX = TX
-        self.TZ = TZ
 
     def run(self):
         max_passes = 400
@@ -71,7 +69,7 @@ class NeuralTrainer(object):
 
         pause = climin.stops.modulo_n_iterations(n_report)
 
-        for i, info in enumerate(m.powerfit((self.X, self.Z), (self.TX, self.TZ), stop, pause)):
+        for i, info in enumerate(m.powerfit((self.X, self.Z), (self.VX, self.VZ), stop, pause)):
             if info['n_iter'] % n_report != 0:
                 continue
             passed = time.time() - start
@@ -81,9 +79,8 @@ class NeuralTrainer(object):
                 'time': passed,
                 'l2-loss': f_wd(self.X),
                 'train_emp': f_n_wrong(self.X, self.Z),
-                'test_emp': f_n_wrong(self.TX, self.TZ),
+                'test_emp': f_n_wrong(self.VX, self.VZ),
             })
             row = '%(n_iter)i\t%(loss)g\t%(val_loss)g\t%(time)g\t%(l2-loss)g\t%(train_emp)g\t%(test_emp)g' % info
             print row
-        print m.predict(self.VX)
-        print "hi"
+        return m

@@ -1,3 +1,5 @@
+from sklearn.linear_model.logistic import LogisticRegression
+
 __author__ = 'kosklain'
 
 from neuralTrainer import NeuralTrainer
@@ -14,7 +16,7 @@ class Trainer:
     def __init__(self, stage=0, preprocessor_suffix="preprocess.pkl",
                  raw_data_file="Train.csv", num_examples=30000,
                  sparse_data_suffix="sparse.pkl", final_train_suffix="final_train.pkl",
-                 proportion_true_false=1):
+                 final_test_suffix="final_test.pkl", proportion_true_false=1):
         self.stage = stage
         self.num_examples = num_examples
         self.raw_data_file = raw_data_file
@@ -29,6 +31,9 @@ class Trainer:
         self.labels_processed = labels_prefix+sparse_data_suffix
         self.data_final_train = data_prefix+final_train_suffix
         self.target_final_train = targets_prefix+final_train_suffix
+        self.data_final_test = data_prefix+final_test_suffix
+        self.target_final_test = targets_prefix+final_test_suffix
+        self.fractions = [0.5, 0.75]
 
     def get_raw_data(self):
         X = CsvCleaner(self.raw_data_file, detector_mode=False,
@@ -108,11 +113,43 @@ class Trainer:
                 current_row += 1
         training = self.build_matrix((new_data, new_indices, new_indptr),
                                      (num_tags, Y.shape[1]+X.shape[1]))
-        targets = targets.reshape(targets.shape[0], 1)
+        #targets = targets.reshape(targets.shape[0], 1)
         f = open(self.data_final_train,'wb')
         cPickle.dump(training, f)
         f.close()
         f = open(self.target_final_train,'wb')
+        cPickle.dump(targets, f)
+        f.close()
+        return training, targets
+
+    def get_final_testing_data(self, X, Y):
+        num_tags = Y.shape[1]
+        offset = X.shape[1]
+        targets = np.zeros(num_tags*Y.shape[0])
+        current_row = 0
+        new_indices = []
+        new_data = []
+        new_indptr = [0]
+        last_indptr = 0
+        for x, y in zip(X, Y):
+            _, labels = y.nonzero()
+            labels += offset
+            data_to_add = np.concatenate((x.data,[1]), axis=0)
+            new_data.extend(np.repeat(data_to_add, len(labels)))
+            indptr_to_add = x.indptr[-1]+1
+            for label in range(offset, offset+num_tags):
+                targets[current_row] = 1 if label in labels else -1
+                new_indices.extend(np.concatenate((x.indices, [label])))
+                last_indptr += indptr_to_add
+                new_indptr.append(last_indptr)
+                current_row += 1
+        training = self.build_matrix((new_data, new_indices, new_indptr),
+                                     (num_tags, Y.shape[1]+X.shape[1]))
+        #targets = targets.reshape(targets.shape[0], 1)
+        f = open(self.data_final_test, 'wb')
+        cPickle.dump(training, f)
+        f.close()
+        f = open(self.target_final_test, 'wb')
         cPickle.dump(targets, f)
         f.close()
         return training, targets
@@ -123,20 +160,14 @@ class Trainer:
         return matrix1[indices, :], matrix2[indices]
 
     def get_sliced_shuffled_data(self, X, Z):
-        if self.stage >= 4:
-            pass
-        fractions = [0.5, 0.75]
-        train_end = round(fractions[0]*X.shape[0])
-        val_end = round(fractions[1]*X.shape[0])
+        train_end = round(self.fractions[0]*X.shape[0])
         new_X, new_Z = self.shuffle_sparse_matrices(0, train_end, X, Z)
-        VX, VZ = self.shuffle_sparse_matrices(train_end, val_end, X, Z)
-        TX, TZ = self.shuffle_sparse_matrices(val_end, X.shape[0], X, Z)
-        return new_X, VX, TX, new_Z, VZ, TZ
+        VX, VZ = self.shuffle_sparse_matrices(train_end, X.shape[0], X, Z)
+        return new_X, VX, new_Z, VZ
 
     def build_matrix(self, info, shape):
         training_sparse = csr_matrix(info, shape=shape, dtype=np.float64)
         return training_sparse
-
 
     def get_projection_matrix(self, in_dim, out_dim):
         # Probaiblity of  {-1,1} is 1/sqrt(in_dim)
@@ -147,19 +178,38 @@ class Trainer:
         P -= 1
         return P
 
-    def get_projected_data(self, X, Z):
+    def get_projected_data(self, X):
         P = self.get_projection_matrix(X.shape[1], 4000)
-        return X.dot(P), Z
+        return X.dot(P)
 
     def run(self):
         tfidf, cv = self.get_preprocessors()
-        X, Y = self.get_transfomed_data(tfidf, cv)
-        X, Z = self.get_final_training_data(X, Y)
-        X, Z = self.get_projected_data(X, Z)
-        X, VX, TX, Z, VZ, TZ = self.get_sliced_shuffled_data(X, Z)
-        nt = NeuralTrainer(X, VX, Z, VZ, TX, TZ)
-        nt.run()
+        X, Z = self.get_transfomed_data(tfidf, cv)
+        val_end = round(self.fractions[1]*X.shape[0])
+        TX = X[val_end:]
+        TZ = Z[val_end:]
+        X = X[:val_end]
+        Z = Z[:val_end]
+        X, Z = self.get_final_training_data(X, Z)
+        X = self.get_projected_data(X)
+        X, VX, Z, VZ = self.get_sliced_shuffled_data(X, Z)
+        model = LogisticRegression()
+        model.fit(X, Z)
+        predictions = model.predict(VX)
+        final_score = 0
+        for pred, gt in zip(predictions, VZ):
+            if pred == gt:
+                final_score += 1
+        print (final_score+0.0)/(0.0+len(VZ))
+        #f = open("model.pkl", 'wb')
+        #cPickle.dump(model, f)
+        #f.close()
+        #TX, TZ = self.get_final_testing_data(TX, TZ)
+        #TX = self.get_projected_data(TX)
+        #predictions = model.predict(TX)
+
+
 
 if __name__ == "__main__":
-    trainer = Trainer(stage=0, num_examples=3000)
+    trainer = Trainer(stage=0, num_examples=30000)
     trainer.run()
