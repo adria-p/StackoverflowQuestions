@@ -100,7 +100,7 @@ class Trainer:
             new_data.extend(np.repeat(data_to_add, len(labels)))
             indptr_to_add = x.indptr[-1]+1
             targets[current_row:current_row+len(true_labels)] = [1]*(len(true_labels))
-            targets[current_row+len(true_labels):current_row+len(labels)] = [0]*(len(true_labels)*self.proportion)
+            targets[current_row+len(true_labels):current_row+len(labels)] = [-1]*(len(true_labels)*self.proportion)
             for label in labels:
                 new_indices.extend(np.concatenate((x.indices, [label])))
                 last_indptr += indptr_to_add
@@ -161,5 +161,5 @@ class Trainer:
         nt.run()
 
 if __name__ == "__main__":
-    trainer = Trainer(stage=0, num_examples=30)
+    trainer = Trainer(stage=0, num_examples=3000)
     trainer.run()

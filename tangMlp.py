@@ -8,6 +8,8 @@ __author__ = 'kosklain'
 
 
 def squared_hinge(target, prediction):
+    print target
+    print prediction
     return T.maximum(1 - target * prediction, 0) ** 2
 
 

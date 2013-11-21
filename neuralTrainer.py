@@ -23,7 +23,7 @@ class NeuralTrainer(object):
         max_passes = 400
         batch_size = 200
         max_iter = max_passes * self.X.shape[0] / batch_size
-        n_report = self.X.shape[0] / batch_size
+        n_report = max(self.X.shape[0] / batch_size, 1)
 
         noise_schedule = (1 - float(i) / max_iter for i in xrange(max_iter))
         noise_schedule = itertools.chain(noise_schedule, itertools.repeat(0))
@@ -33,7 +33,7 @@ class NeuralTrainer(object):
         # 'momentum': 0.5, 'momentum_type': 'nesterov'}
         #optimizer = dropout_optimizer_conf(steprate_0=1, n_repeats=1)
 
-        m = TangMlp(self.X.shape[1], [512], 1, hidden_transfers=['sigmoid'],
+        m = TangMlp(self.X.shape[1], [4000], 1, hidden_transfers=['sigmoid'],
                     out_transfer='identity', loss=squared_hinge, noise_schedule=noise_schedule,
                     optimizer=optimizer, batch_size=batch_size, max_iter=max_iter)
         climin.initialize.randomize_normal(m.parameters.data, 0, 0.02)
@@ -48,7 +48,7 @@ class NeuralTrainer(object):
         m.exprs['loss'] = m.exprs['loss'] + c_wd * weight_decay
 
         f_wd = m.function(['inpt'], c_wd * weight_decay)
-        n_wrong = 1 - T.eq(T.argmax(m.exprs['output'], axis=1), T.argmax(m.exprs['target'], axis=1)).mean()
+        n_wrong = abs(m.exprs['output'] - m.exprs['target']).mean()
         f_n_wrong = m.function(['inpt', 'target'], n_wrong)
 
         losses = []
@@ -85,3 +85,5 @@ class NeuralTrainer(object):
             })
             row = '%(n_iter)i\t%(loss)g\t%(val_loss)g\t%(time)g\t%(l2-loss)g\t%(train_emp)g\t%(test_emp)g' % info
             print row
+        print m.predict(self.VX)
+        print "hi"
