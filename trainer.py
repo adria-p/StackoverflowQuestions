@@ -231,5 +231,5 @@ class Trainer:
 
 
 if __name__ == "__main__":
-    trainer = Trainer(stage=2, num_examples=3000000)
+    trainer = Trainer(stage=0, num_examples=300000)
     trainer.run()
