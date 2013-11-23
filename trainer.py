@@ -1,55 +1,48 @@
-from sklearn.linear_model.logistic import LogisticRegression
+
 
 __author__ = 'kosklain'
 
 from neuralTrainer import NeuralTrainer
+from sklearn.linear_model import SGDClassifier
 from csvCleaner import CsvCleaner
 from sklearn.feature_extraction.text import TfidfVectorizer, CountVectorizer
 from sklearn.externals import joblib
 import cPickle
 import string
 import numpy as np
-from scipy.sparse import csr_matrix
+from scipy.sparse import csr_matrix, vstack
 import time
 
-class Trainer:
+
+class Dataset(object):
     def __init__(self, stage=0, preprocessor_suffix="preprocess.pkl",
-                 raw_data_file="Train.csv", num_examples=30000,
-                 sparse_data_suffix="sparse.pkl", final_train_suffix="final_train.pkl",
-                 final_test_suffix="final_test.pkl", proportion_true_false=1):
+                 raw_data_file="Train.csv", start=0, end=30000,
+                 proportion_true_false=1, calculate_preprocessors=True):
         self.stage = stage
-        self.num_examples = num_examples
+        self.start = start
+        self.end = end
         self.raw_data_file = raw_data_file
         self.preprocessor_suffix = preprocessor_suffix
         self.proportion = proportion_true_false
         data_prefix = "data_"
         labels_prefix = "labels_"
-        targets_prefix = "targets_"
         self.data_preprocessor = data_prefix+preprocessor_suffix
         self.labels_preprocessor = labels_prefix+preprocessor_suffix
-        self.data_processed = data_prefix+sparse_data_suffix
-        self.labels_processed = labels_prefix+sparse_data_suffix
-        self.data_final_train = data_prefix+final_train_suffix
-        self.target_final_train = targets_prefix+final_train_suffix
-        self.data_final_test = data_prefix+final_test_suffix
-        self.target_final_test = targets_prefix+final_test_suffix
-        self.fractions = [0.5, 0.75]
+        self.tfidf, self.cv = self.get_preprocessors(calculate_preprocessors)
 
     def get_raw_data(self):
         X = CsvCleaner(self.raw_data_file, detector_mode=False,
-                       report_every=10000, end=self.num_examples,
-                       only_tags=False)
+                       report_every=10000, start=self.start,
+                       end=self.end, only_tags=False)
         Y = CsvCleaner(self.raw_data_file, detector_mode=False,
-                       report_every=10000, end=self.num_examples,
-                       only_tags=True)
+                       report_every=10000, start=self.start,
+                       end=self.end, only_tags=True)
         return X, Y
 
-    def get_preprocessors(self):
-        if self.stage == 1:
+    def get_preprocessors(self, calculate):
+        if not calculate:
             return joblib.load(self.data_preprocessor), joblib.load(self.labels_preprocessor)
-        if self.stage > 1:
-            return None, None
-        tfidf = TfidfVectorizer(ngram_range=(1, 2), min_df=2, max_features=1000)
+        tfidf = TfidfVectorizer(ngram_range=(1, 2), min_df=2, max_features=10000)
         cv = CountVectorizer(tokenizer=string.split)
         X, Y = self.get_raw_data()
         tfidf.fit(X)
@@ -57,70 +50,6 @@ class Trainer:
         joblib.dump(tfidf, self.data_preprocessor)
         joblib.dump(cv, self.labels_preprocessor)
         return tfidf, cv
-
-    def get_transfomed_data(self, tfidf, cv):
-        if self.stage == 2:
-            f = open(self.data_processed, "rb")
-            f2 = open(self.labels_processed, "rb")
-            return cPickle.load(f), cPickle.load(f2)
-        if self.stage > 2:
-            return None
-        X, Y = self.get_raw_data()
-        transformed_X = tfidf.transform(X)
-        transformed_Y = cv.transform(Y)
-        f = open(self.data_processed, 'wb')
-        cPickle.dump(transformed_X, f)
-        f.close()
-        f = open(self.labels_processed, 'wb')
-        cPickle.dump(transformed_Y, f)
-        f.close()
-        return transformed_X, transformed_Y
-
-    def get_final_training_data(self, X, Y):
-        if self.stage == 3:
-            f = open(self.data_final_train, "rb")
-            f2 = open(self.target_final_train, "rb")
-            return cPickle.load(f), cPickle.load(f2)
-        if self.stage > 3:
-            return None, None
-        num_tags = len(Y.data)*(1+self.proportion)
-        offset = X.shape[1]
-        random_range = Y.shape[1]
-        targets = np.zeros(num_tags)
-        current_row = 0
-        new_indices = []
-        new_data = []
-        new_indptr = [0]
-        last_indptr = 0
-        np.random.seed(67)
-        for x, y in zip(X, Y):
-            _, true_labels = y.nonzero()
-            random_labels = np.random.randint(random_range - len(true_labels),
-                                              size=self.proportion*len(true_labels))
-            for label in true_labels:
-                random_labels[random_labels >= label] += 1
-            labels = np.concatenate((true_labels, random_labels))
-            labels += offset
-            data_to_add = np.concatenate((x.data,[1]), axis=0)
-            new_data.extend(np.repeat(data_to_add, len(labels)))
-            indptr_to_add = x.indptr[-1]+1
-            targets[current_row:current_row+len(true_labels)] = [1]*(len(true_labels))
-            targets[current_row+len(true_labels):current_row+len(labels)] = [-1]*(len(true_labels)*self.proportion)
-            for label in labels:
-                new_indices.extend(np.concatenate((x.indices, [label])))
-                last_indptr += indptr_to_add
-                new_indptr.append(last_indptr)
-                current_row += 1
-        training = self.build_matrix((new_data, new_indices, new_indptr),
-                                     (num_tags, Y.shape[1]+X.shape[1]))
-        #targets = targets.reshape(targets.shape[0], 1)
-        f = open(self.data_final_train,'wb')
-        cPickle.dump(training, f)
-        f.close()
-        f = open(self.target_final_train,'wb')
-        cPickle.dump(targets, f)
-        f.close()
-        return training, targets
 
     def get_final_testing_data(self, X, Y):
         num_tags = Y.shape[1]
@@ -183,44 +112,44 @@ class Trainer:
         return X.dot(P)
 
     def run(self):
-	print "Num examples: "+str(self.num_examples)
-	actual_time = time.time()
-        tfidf, cv = self.get_preprocessors()
-	new_time = time.time()
-	print "Time spent in building the preprocessors: "+str(new_time-actual_time)
-	actual_time = new_time
-        X, Z = self.get_transfomed_data(tfidf, cv)
+        print "Num examples: %d" % (self.end - self.start)
+        actual_time = time.time()
+        self.tfidf, self.cv = self.get_preprocessors()
         new_time = time.time()
-        print "Time spent in transforming the data: "+str(new_time-actual_time)
-        actual_time = new_time
-	val_end = round(self.fractions[1]*X.shape[0])
-        TX = X[val_end:]
-        X = X[:val_end]
-	TZ = Z[val_end:]
-        Z = Z[:val_end]
-        X, Z = self.get_final_training_data(X, Z)
-	new_time = time.time()
-        print "Time spent in preparing the data: "+str(new_time-actual_time)
-        actual_time = new_time
-        #X = self.get_projected_data(X)
-        X, VX, Z, VZ = self.get_sliced_shuffled_data(X, Z)
-	new_time = time.time()
-        print "Time spent in slicing and shuffling: "+str(new_time-actual_time)
-        actual_time = new_time
-        model = LogisticRegression()
-        model.fit(X, Z)
-	new_time = time.time()
-        print "Time spent in training: "+str(new_time-actual_time)
-        actual_time = new_time
-        predictions = model.predict(VX)
-	new_time = time.time()
-        print "Time spent in predicting: "+str(new_time-actual_time)
-        actual_time = new_time
-        final_score = 0
-        for pred, gt in zip(predictions, VZ):
-            if pred == gt:
-                final_score += 1
-        print (final_score+0.0)/(0.0+len(VZ))
+        print "Time spent in building the preprocessors: "+str(new_time-actual_time)
+
+
+    def __iter__(self):
+        X, Y = self.get_raw_data()
+        offset = len(self.tfidf.vocabulary_)
+        random_range = len(self.cv.vocabulary_)
+        for tx, ty in zip(X, Y):
+            x = self.tfidf.transform([tx])
+            y = self.cv.transform([ty])
+            new_indices = []
+            new_data = []
+            new_indptr = [0]
+            last_indptr = 0
+            _, true_labels = y.nonzero()
+            random_labels = np.random.randint(random_range - len(true_labels),
+                                              size=self.proportion*len(true_labels))
+            for label in true_labels:
+                random_labels[random_labels >= label] += 1
+            labels = np.concatenate((true_labels, random_labels))
+            labels += offset
+            data_to_add = np.concatenate((x.data, [1]), axis=0)
+            new_data.extend(np.repeat(data_to_add, len(labels)))
+            indptr_to_add = x.indptr[-1]+1
+            targets = [1]*(len(true_labels))
+            targets.extend([-1]*(len(true_labels)*self.proportion))
+            for label in labels:
+                new_indices.extend(np.concatenate((x.indices, [label])))
+                last_indptr += indptr_to_add
+                new_indptr.append(last_indptr)
+            training = self.build_matrix((new_data, new_indices, new_indptr),
+                                        (len(labels), offset+random_range))
+            yield training, targets
+
         #f = open("model.pkl", 'wb')
         #cPickle.dump(model, f)
         #f.close()
@@ -231,5 +160,62 @@ class Trainer:
 
 
 if __name__ == "__main__":
-    trainer = Trainer(stage=0, num_examples=300000)
-    trainer.run()
+    training_dataset = Dataset(calculate_preprocessors=True, end=30000)
+    validation_dataset = Dataset(calculate_preprocessors=False, start=30000, end=50000)
+    batch_size = 500
+    actual_time = time.time()
+    model = SGDClassifier(loss="log", verbose=3, n_jobs=4, random_state=2, n_iter=5)
+    first = True
+    for i, (x, y) in enumerate(training_dataset):
+        if first:
+            X = x
+            Y = y
+            first = False
+        else:
+            X = vstack((X, x))
+            Y = np.concatenate((Y, y), axis=0)
+        if (i+1) % batch_size == 0:
+            first = True
+            model.partial_fit(X,Y, classes=[-1, 1])
+    new_time = time.time()
+    print "Time spent in training: "+str(new_time-actual_time)
+    actual_time = new_time
+
+    TP = 0
+    FP = 0
+    TN = 0
+    FN = 0
+    first = True
+    for i, (x, y) in enumerate(validation_dataset):
+        if first:
+            if len(y) != 0:
+                X = x
+                Y = y
+                first = False
+        else:
+            if len(y) == 0:
+                X = vstack((X, X[-1]), format="csr")
+                Y = np.concatenate((Y, [1]), axis=0)
+            else:
+                X = vstack((X, x), format="csr")
+                Y = np.concatenate((Y, y), axis=0)
+        if (i+1) % batch_size == 0:
+            first = True
+            predictions = model.predict(X)
+            for pred, gt in zip(predictions, Y):
+                if gt == 1:
+                    if pred == 1:
+                        TP += 1
+                    else:
+                        FN += 1
+                else:
+                    if pred == 1:
+                        FP += 1
+                    else:
+                        TN += 1
+
+
+    new_time = time.time()
+    print "Time spent in predicting: "+str(new_time-actual_time)
+    print TP, FP, TN, FN
+    print "Final score: %f" % ((TP+TN+0.0)/(TP+TN+FP+FN+0.0))
