@@ -105,12 +105,10 @@ class CsvCleaner:
         current_line = 0
         for line in csv_reader:
             current_line += 1
-            if current_line == 1:
+            if current_line == 1 or current_line < self.start_reading+1:
                 continue
             if self.report_every != 0 and current_line % self.report_every == 0:
                 print "Round: %d" % current_line
-            if current_line < self.start_reading:
-                continue
             if current_line > self.end_reading:
                 if self.end_reading != -1:
                     break

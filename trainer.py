@@ -1,4 +1,4 @@
-
+from itertools import izip
 
 __author__ = 'kosklain'
 
@@ -123,7 +123,7 @@ class Dataset(object):
         X, Y = self.get_raw_data()
         offset = len(self.tfidf.vocabulary_)
         random_range = len(self.cv.vocabulary_)
-        for tx, ty in zip(X, Y):
+        for tx, ty in izip(X, Y):
             x = self.tfidf.transform([tx])
             y = self.cv.transform([ty])
             new_indices = []
@@ -165,18 +165,17 @@ if __name__ == "__main__":
     batch_size = 500
     actual_time = time.time()
     model = SGDClassifier(loss="log", verbose=3, n_jobs=4, random_state=2, n_iter=5)
-    first = True
+    current_batch_X = []
+    current_batch_Y = []
     for i, (x, y) in enumerate(training_dataset):
-        if first:
-            X = x
-            Y = y
-            first = False
-        else:
-            X = vstack((X, x))
-            Y = np.concatenate((Y, y), axis=0)
+        current_batch_X.append(x)
+        current_batch_Y.append(y)
         if (i+1) % batch_size == 0:
-            first = True
+            X = vstack(current_batch_X)
+            Y = np.concatenate(current_batch_Y, axis=0)
             model.partial_fit(X,Y, classes=[-1, 1])
+            current_batch_X = []
+            current_batch_Y = []
     new_time = time.time()
     print "Time spent in training: "+str(new_time-actual_time)
     actual_time = new_time
@@ -185,22 +184,18 @@ if __name__ == "__main__":
     FP = 0
     TN = 0
     FN = 0
-    first = True
+    current_batch_X = []
+    current_batch_Y = []
     for i, (x, y) in enumerate(validation_dataset):
-        if first:
-            if len(y) != 0:
-                X = x
-                Y = y
-                first = False
+        if len(y) == 0:
+            current_batch_X.append(current_batch_X[-1])
+            current_batch_Y.append([1])
         else:
-            if len(y) == 0:
-                X = vstack((X, X[-1]), format="csr")
-                Y = np.concatenate((Y, [1]), axis=0)
-            else:
-                X = vstack((X, x), format="csr")
-                Y = np.concatenate((Y, y), axis=0)
+            current_batch_X.append(x)
+            current_batch_Y.append(y)
         if (i+1) % batch_size == 0:
-            first = True
+            X = vstack(current_batch_X, format="csr")
+            Y = np.concatenate(current_batch_Y, axis=0)
             predictions = model.predict(X)
             for pred, gt in zip(predictions, Y):
                 if gt == 1:
@@ -213,7 +208,8 @@ if __name__ == "__main__":
                         FP += 1
                     else:
                         TN += 1
-
+            current_batch_X = []
+            current_batch_Y = []
 
     new_time = time.time()
     print "Time spent in predicting: "+str(new_time-actual_time)
