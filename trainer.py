@@ -1,9 +1,10 @@
 from itertools import izip
+from logisiticTrainer import LogisticTrainer
 
 __author__ = 'kosklain'
 
 from neuralTrainer import NeuralTrainer
-from sklearn.linear_model import SGDClassifier
+from sklearn.linear_model import SGDClassifier, LogisticRegression
 from csvCleaner import CsvCleaner
 from sklearn.feature_extraction.text import TfidfVectorizer, CountVectorizer
 from sklearn.externals import joblib
@@ -17,7 +18,8 @@ import time
 class Dataset(object):
     def __init__(self, stage=0, preprocessor_suffix="preprocess.pkl",
                  raw_data_file="Train.csv", start=0, end=30000,
-                 proportion_true_false=1, calculate_preprocessors=True):
+                 proportion_true_false=1, calculate_preprocessors=True,
+                 preprocessors = None):
         self.stage = stage
         self.start = start
         self.end = end
@@ -28,7 +30,7 @@ class Dataset(object):
         labels_prefix = "labels_"
         self.data_preprocessor = data_prefix+preprocessor_suffix
         self.labels_preprocessor = labels_prefix+preprocessor_suffix
-        self.tfidf, self.cv = self.get_preprocessors(calculate_preprocessors)
+        self.tfidf, self.cv = self.get_preprocessors(calculate_preprocessors) if preprocessors is None else preprocessors
 
     def get_raw_data(self):
         X = CsvCleaner(self.raw_data_file, detector_mode=False,
@@ -42,7 +44,7 @@ class Dataset(object):
     def get_preprocessors(self, calculate):
         if not calculate:
             return joblib.load(self.data_preprocessor), joblib.load(self.labels_preprocessor)
-        tfidf = TfidfVectorizer(ngram_range=(1, 2), min_df=2, max_features=10000)
+        tfidf = TfidfVectorizer(ngram_range=(1, 2), min_df=0.001, max_features=10000)
         cv = CountVectorizer(tokenizer=string.split)
         X, Y = self.get_raw_data()
         tfidf.fit(X)
@@ -118,12 +120,11 @@ class Dataset(object):
         new_time = time.time()
         print "Time spent in building the preprocessors: "+str(new_time-actual_time)
 
-
     def __iter__(self):
         X, Y = self.get_raw_data()
         offset = len(self.tfidf.vocabulary_)
         random_range = len(self.cv.vocabulary_)
-        for tx, ty in izip(X, Y):
+        for tx, ty in izip(X,Y):
             x = self.tfidf.transform([tx])
             y = self.cv.transform([ty])
             new_indices = []
@@ -140,8 +141,9 @@ class Dataset(object):
             data_to_add = np.concatenate((x.data, [1]), axis=0)
             new_data.extend(np.repeat(data_to_add, len(labels)))
             indptr_to_add = x.indptr[-1]+1
-            targets = [1]*(len(true_labels))
-            targets.extend([-1]*(len(true_labels)*self.proportion))
+            targets = np.zeros((len(true_labels)*(1+self.proportion), 1))
+            targets[:len(true_labels)] = 1
+            targets[len(true_labels):] = -1
             for label in labels:
                 new_indices.extend(np.concatenate((x.indices, [label])))
                 last_indptr += indptr_to_add
@@ -150,68 +152,129 @@ class Dataset(object):
                                         (len(labels), offset+random_range))
             yield training, targets
 
-        #f = open("model.pkl", 'wb')
-        #cPickle.dump(model, f)
-        #f.close()
-        #TX, TZ = self.get_final_testing_data(TX, TZ)
-        #TX = self.get_projected_data(TX)
-        #predictions = model.predict(TX)
+
+class ValidationDataset(Dataset):
+    def __iter__(self):
+        X, Y = self.get_raw_data()
+        offset = len(self.tfidf.vocabulary_)
+        y_range = len(self.cv.vocabulary_)
+        for tx, ty in izip(X, Y):
+            x = self.tfidf.transform([tx])
+            y = self.cv.transform([ty])
+            new_indices = []
+            new_data = []
+            new_indptr = [0]
+            last_indptr = 0
+            labels = np.arange(y_range)
+            labels += offset
+            data_to_add = np.concatenate((x.data, [1]), axis=0)
+            new_data.extend(np.repeat(data_to_add, len(labels)))
+            indptr_to_add = x.indptr[-1]+1
+            targets = np.zeros(len(self.cv.vocabulary_), 1)
+            targets[y.indices][0] = 2
+            targets -= 1
+            for label in labels:
+                new_indices.extend(np.concatenate((x.indices, [label])))
+                last_indptr += indptr_to_add
+                new_indptr.append(last_indptr)
+            training = self.build_matrix((new_data, new_indices, new_indptr),
+                                        (len(labels), offset+y_range))
+            yield training, targets, tx, ty
 
 
-
-if __name__ == "__main__":
-    training_dataset = Dataset(calculate_preprocessors=True, end=30000)
-    validation_dataset = Dataset(calculate_preprocessors=False, start=30000, end=50000)
-    batch_size = 500
-    actual_time = time.time()
-    model = SGDClassifier(loss="log", verbose=3, n_jobs=4, random_state=2, n_iter=5)
-    current_batch_X = []
-    current_batch_Y = []
-    for i, (x, y) in enumerate(training_dataset):
-        current_batch_X.append(x)
-        current_batch_Y.append(y)
-        if (i+1) % batch_size == 0:
-            X = vstack(current_batch_X)
-            Y = np.concatenate(current_batch_Y, axis=0)
-            model.partial_fit(X,Y, classes=[-1, 1])
-            current_batch_X = []
-            current_batch_Y = []
-    new_time = time.time()
-    print "Time spent in training: "+str(new_time-actual_time)
-    actual_time = new_time
-
-    TP = 0
-    FP = 0
-    TN = 0
-    FN = 0
-    current_batch_X = []
-    current_batch_Y = []
-    for i, (x, y) in enumerate(validation_dataset):
-        if len(y) == 0:
-            current_batch_X.append(current_batch_X[-1])
-            current_batch_Y.append([1])
-        else:
+class BatchesTrainer():
+    def __init__(self, training, validation):
+        self.training = training
+        self.validation = validation
+        self.testing = None
+    def run(self):
+        batch_size = 500
+        actual_time = time.time()
+        LogisticRegression()
+        model = SGDClassifier(fit_intercept=False, penalty="l2", loss="log", verbose=10,
+                              n_jobs=4, random_state=2, n_iter=500)
+        current_batch_X = []
+        current_batch_Y = []
+        for i, (x, y) in enumerate(self.training):
             current_batch_X.append(x)
             current_batch_Y.append(y)
-        if (i+1) % batch_size == 0:
-            X = vstack(current_batch_X, format="csr")
-            Y = np.concatenate(current_batch_Y, axis=0)
-            predictions = model.predict(X)
-            for pred, gt in zip(predictions, Y):
-                if gt == 1:
-                    if pred == 1:
-                        TP += 1
-                    else:
-                        FN += 1
-                else:
-                    if pred == 1:
-                        FP += 1
-                    else:
-                        TN += 1
-            current_batch_X = []
-            current_batch_Y = []
+            if (i+1) % batch_size == 0:
+                X = vstack(current_batch_X)
+                Y = np.concatenate(current_batch_Y, axis=0)
+                model.partial_fit(X,Y, classes=[-1, 1])
+                current_batch_X = []
+                current_batch_Y = []
+        new_time = time.time()
+        print "Time spent in training: "+str(new_time-actual_time)
+        actual_time = new_time
 
-    new_time = time.time()
-    print "Time spent in predicting: "+str(new_time-actual_time)
-    print TP, FP, TN, FN
-    print "Final score: %f" % ((TP+TN+0.0)/(TP+TN+FP+FN+0.0))
+        del(self.training)
+        TP = 0
+        FP = 0
+        TN = 0
+        FN = 0
+        current_batch_X = []
+        current_batch_Y = []
+        for i, (x, y) in enumerate(self.validation):
+            if len(y) == 0:
+                if len(current_batch_X) != 0:
+                    current_batch_X.append(current_batch_X[-1])
+                    current_batch_Y.append([1])
+            else:
+                current_batch_X.append(x)
+                current_batch_Y.append(y)
+            if (i+1) % batch_size == 0:
+                X = vstack(current_batch_X, format="csr")
+                Y = np.concatenate(current_batch_Y, axis=0)
+                predictions = model.predict(X)
+                for pred, gt in zip(predictions, Y):
+                    if gt == 1:
+                        if pred == 1:
+                            TP += 1
+                        else:
+                            FN += 1
+                    else:
+                        if pred == 1:
+                            FP += 1
+                        else:
+                            TN += 1
+                current_batch_X = []
+                current_batch_Y = []
+        new_time = time.time()
+        print "Time spent in predicting: "+str(new_time-actual_time)
+        print TP, FP, TN, FN
+        print "Final score: %f" % ((TP+TN+0.0)/(TP+TN+FP+FN+0.0))
+        batch_size = 1
+        for i, (x, y, tx, ty) in enumerate(self.testing):
+            if len(y) == 0:
+                current_batch_X.append(current_batch_X[-1])
+                current_batch_Y.append([1])
+            else:
+                current_batch_X.append(x)
+                current_batch_Y.append(y)
+            if (i+1) % batch_size == 0:
+                X = vstack(current_batch_X, format="csr")
+                Y = np.concatenate(current_batch_Y, axis=0)
+                predictions = model.predict_proba(X)
+                for i, (pred, gt) in enumerate(zip(predictions, Y)):
+                    if gt == 1:
+                        print "Text:"
+                        print tx
+                        print "Tags:"
+                        print ty
+                        print "Probabilities predicted:"
+                        print pred
+                current_batch_X = []
+                current_batch_Y = []
+
+if __name__ == "__main__":
+    training_dataset = Dataset(calculate_preprocessors=True, end=6000)
+    validation_dataset = Dataset(calculate_preprocessors=False,
+                                 preprocessors=(training_dataset.tfidf, training_dataset.cv),
+                                 start=6000, end=9000)
+    """testing_dataset = ValidationDataset(calculate_preprocessors=False,
+                                 preprocessors=(training_dataset.tfidf, training_dataset.cv),
+                                 start=500, end=600)"""
+    lt = LogisticTrainer(training_dataset, validation_dataset,
+                         len(training_dataset.tfidf.vocabulary_)+len(training_dataset.cv.vocabulary_))
+    lt.run()
