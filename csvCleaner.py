@@ -1,6 +1,9 @@
 __author__ = 'apuigdom'
 import csv
 import re
+from multiprocessing import Pool
+import numpy as np
+
 class CsvCleaner:
     def __init__(self, csv_file, start=0, end=-1, detector_mode=False, report_every=0, only_tags=False):
         self.csv = csv_file
@@ -132,11 +135,38 @@ class LineCounter(object):
         csv_file = open(self.csv)
         csv_reader = csv.reader(csv_file)
         counter = 0
-        for line in csv_reader:
+        for _ in csv_reader:
             counter += 1
         return counter
 
+class RepeatedTitlesCounter(object):
+    def __init__(self, csv_train, csv_test):
+        self.csv_train = csv_train
+        self.csv_test = csv_test
+
+    def count_repeated_titles(self):
+        print "Starting to store titles"
+        csv_reader_train = csv.reader(open(self.csv_train))
+        next(csv_reader_train)
+        train_titles = [line[1] for line in csv_reader_train]
+        print "Done with titles in training"
+        csv_reader_test = csv.reader(open(self.csv_test))
+        next(csv_reader_test)
+        test_titles = [(i, line[1]) for i, line in enumerate(csv_reader_test)]
+        def is_repeated(title):
+            if title[0] % 10000:
+                print "Round %d" % title[0]
+            if title[1] in train_titles:
+                return title
+            return None
+        pool = Pool(processes=4)
+        result = pool.map(is_repeated(), test_titles)
+        final_index_array = np.array([element[0] for element in result if element != None])
+        print "Done, %d out of %d" % (len(final_index_array), len(result))
+        np.save("repeated_test", final_index_array)
+
+
 if __name__ == "__main__":
-    lc = LineCounter("Train.csv")
-    print lc.count_lines()
+    lc = RepeatedTitlesCounter("Train.csv", "Test.csv")
+    print lc.count_repeated_titles()
 
