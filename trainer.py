@@ -268,10 +268,10 @@ class BatchesTrainer():
                 current_batch_Y = []
 
 if __name__ == "__main__":
-    training_dataset = Dataset(calculate_preprocessors=True, end=6000)
+    training_dataset = Dataset(calculate_preprocessors=True, end=1000000)
     validation_dataset = Dataset(calculate_preprocessors=False,
                                  preprocessors=(training_dataset.tfidf, training_dataset.cv),
-                                 start=6000, end=9000)
+                                 start=1000000, end=2000000)
     """testing_dataset = ValidationDataset(calculate_preprocessors=False,
                                  preprocessors=(training_dataset.tfidf, training_dataset.cv),
                                  start=500, end=600)"""

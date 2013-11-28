@@ -153,14 +153,15 @@ class RepeatedTitlesCounter(object):
         csv_reader_test = csv.reader(open(self.csv_test))
         next(csv_reader_test)
         test_titles = [(i, line[1]) for i, line in enumerate(csv_reader_test)]
-        def is_repeated(title):
-            if title[0] % 10000:
+        print "Done with the titles in testing"
+	def is_repeated(title):
+            if (title[0] % 10000) == 0:
                 print "Round %d" % title[0]
             if title[1] in train_titles:
                 return title
             return None
         pool = Pool(processes=4)
-        result = pool.map(is_repeated(), test_titles)
+        result = [is_repeated(i) for i in test_titles]
         final_index_array = np.array([element[0] for element in result if element != None])
         print "Done, %d out of %d" % (len(final_index_array), len(result))
         np.save("repeated_test", final_index_array)
