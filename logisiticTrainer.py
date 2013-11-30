@@ -1,4 +1,4 @@
-from brummlearn.glm import GeneralizedLinearModel
+from brummlearn.glm import GeneralizedLinearSparseModel
 import climin
 from scipy.sparse import vstack
 import climin.stops
@@ -16,9 +16,8 @@ class LogisticTrainer(object):
         self.feature_size = feature_size
 
     def run(self):
-        max_passes = 1000
         batch_size = 500
-        max_iter = 30000
+        max_iter = 3000
         X = []
         Z = []
         for x, z in self.fit_data:
@@ -43,8 +42,8 @@ class LogisticTrainer(object):
             ])
         pause = climin.stops.modulo_n_iterations(10)
         optimizer = 'rmsprop', {'steprate': 0.0001, 'momentum': 0.9, 'decay': 0.9, 'step_adapt': 0.01}
-        m = GeneralizedLinearModel(self.feature_size, 1, out_transfer='sigmoid', loss='squared', optimizer=optimizer,
-                                   batch_size=batch_size, max_iter=max_iter, sparse=True)
+        m = GeneralizedLinearSparseModel(self.feature_size, 1, out_transfer='sigmoid', loss='squared',
+                                         optimizer=optimizer, batch_size=batch_size, max_iter=max_iter)
         losses = []
         v_losses = []
         weight_decay = ((m.parameters.in_to_out ** 2).sum())# + (m.parameters.bias**2).sum())

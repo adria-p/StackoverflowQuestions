@@ -44,7 +44,8 @@ class Dataset(object):
     def get_preprocessors(self, calculate):
         if not calculate:
             return joblib.load(self.data_preprocessor), joblib.load(self.labels_preprocessor)
-        tfidf = TfidfVectorizer(ngram_range=(1, 2), min_df=0.001, max_features=10000)
+        tfidf = TfidfVectorizer(ngram_range=(1, 2), min_df=0.0001, max_features=None, sublinear_tf=1,
+                                smooth_idf=1, use_idf=1)
         cv = CountVectorizer(tokenizer=string.split)
         X, Y = self.get_raw_data()
         tfidf.fit(X)
@@ -268,10 +269,10 @@ class BatchesTrainer():
                 current_batch_Y = []
 
 if __name__ == "__main__":
-    training_dataset = Dataset(calculate_preprocessors=True, end=1000000)
+    training_dataset = Dataset(calculate_preprocessors=True, end=10000)
     validation_dataset = Dataset(calculate_preprocessors=False,
                                  preprocessors=(training_dataset.tfidf, training_dataset.cv),
-                                 start=1000000, end=2000000)
+                                 start=10000, end=20000)
     """testing_dataset = ValidationDataset(calculate_preprocessors=False,
                                  preprocessors=(training_dataset.tfidf, training_dataset.cv),
                                  start=500, end=600)"""
