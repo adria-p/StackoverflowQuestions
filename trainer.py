@@ -18,14 +18,14 @@ import time
 class Dataset(object):
     def __init__(self, stage=0, preprocessor_suffix="preprocess.pkl",
                  raw_data_file="Train.csv", start=0, end=30000,
-                 proportion_true_false=1, calculate_preprocessors=True,
-                 preprocessors = None):
+                 calculate_preprocessors=True,
+                 unbalance=(True, 50), preprocessors = None):
         self.stage = stage
         self.start = start
         self.end = end
         self.raw_data_file = raw_data_file
         self.preprocessor_suffix = preprocessor_suffix
-        self.proportion = proportion_true_false
+        self.fixed_unbalance, self.unbalance_amount = unbalance
         data_prefix = "data_"
         labels_prefix = "labels_"
         self.data_preprocessor = data_prefix+preprocessor_suffix
@@ -44,8 +44,7 @@ class Dataset(object):
     def get_preprocessors(self, calculate):
         if not calculate:
             return joblib.load(self.data_preprocessor), joblib.load(self.labels_preprocessor)
-        tfidf = TfidfVectorizer(ngram_range=(1, 2), min_df=0.0001, max_features=None, sublinear_tf=1,
-                                smooth_idf=1, use_idf=1)
+        tfidf = TfidfVectorizer(ngram_range=(1, 2), min_df=0.001, max_features=None)
         cv = CountVectorizer(tokenizer=string.split)
         X, Y = self.get_raw_data()
         tfidf.fit(X)
@@ -133,8 +132,12 @@ class Dataset(object):
             new_indptr = [0]
             last_indptr = 0
             _, true_labels = y.nonzero()
-            random_labels = np.random.randint(random_range - len(true_labels),
-                                              size=self.proportion*len(true_labels))
+            if self.fixed_unbalance:
+                random_labels = np.random.randint(random_range - len(true_labels),
+                                                  size=self.unbalance_amount-len(true_labels))
+            else:
+                random_labels = np.random.randint(random_range - len(true_labels),
+                                                  size=self.unbalance_amount*len(true_labels))
             for label in true_labels:
                 random_labels[random_labels >= label] += 1
             labels = np.concatenate((true_labels, random_labels))
@@ -142,7 +145,7 @@ class Dataset(object):
             data_to_add = np.concatenate((x.data, [1]), axis=0)
             new_data.extend(np.repeat(data_to_add, len(labels)))
             indptr_to_add = x.indptr[-1]+1
-            targets = np.zeros((len(true_labels)*(1+self.proportion), 1))
+            targets = np.zeros((len(labels), 1))
             targets[:len(true_labels)] = 1
             targets[len(true_labels):] = -1
             for label in labels:
@@ -270,15 +273,15 @@ class BatchesTrainer():
 
 if __name__ == "__main__":
     actual_time = time.time()
-    training_dataset = Dataset(calculate_preprocessors=True, end=10000)
+    tags_per_example = 400
+    unbalance = (True, tags_per_example)
+    training_dataset = Dataset(calculate_preprocessors=True, end=80000, unbalance=unbalance)
     new_time = time.time()
     print "Time spent in building the tfidf and cv: "+str(new_time-actual_time)
-    validation_dataset = Dataset(calculate_preprocessors=False,
+    validation_dataset = Dataset(calculate_preprocessors=False, unbalance=unbalance,
                                  preprocessors=(training_dataset.tfidf, training_dataset.cv),
-                                 start=10000, end=20000)
-    """testing_dataset = ValidationDataset(calculate_preprocessors=False,
-                                 preprocessors=(training_dataset.tfidf, training_dataset.cv),
-                                 start=500, end=600)"""
+                                 start=100000, end=101000)
     lt = LogisticTrainer(training_dataset, validation_dataset,
-                         len(training_dataset.tfidf.vocabulary_)+len(training_dataset.cv.vocabulary_))
+                         len(training_dataset.tfidf.vocabulary_)+len(training_dataset.cv.vocabulary_),
+                         tags_per_example)
     lt.run()
