@@ -3,7 +3,7 @@ import climin
 from scipy.sparse import vstack
 import climin.stops
 import numpy as np
-import theano
+import time
 
 __author__ = 'kosklain'
 
@@ -18,6 +18,7 @@ class LogisticTrainer(object):
     def run(self):
         batch_size = 500
         max_iter = 3000
+        actual_time = time.time()
         X = []
         Z = []
         for x, z in self.fit_data:
@@ -25,7 +26,9 @@ class LogisticTrainer(object):
             Z.append(z)
         X = vstack(X, format="csr")
         Z = np.concatenate(Z, axis=0)
-
+        new_time = time.time()
+        print "Time spent in transforming the training dataset: "+str(new_time-actual_time)
+        actual_time = new_time
         VX = []
         VZ = []
         for vx, vz in self.eval_data:
@@ -34,7 +37,8 @@ class LogisticTrainer(object):
                 VZ.append(vz)
         VX = vstack(VX, format="csr")
         VZ = np.concatenate(VZ, axis=0)
-
+        new_time = time.time()
+        print "Time spent in transforming the validation dataset: "+str(new_time-actual_time)
         stop = climin.stops.any_([
             #climin.stops.converged('loss'),
             #climin.stops.rising('val_loss', 10, 1e-5, patience=5),

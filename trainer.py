@@ -269,7 +269,10 @@ class BatchesTrainer():
                 current_batch_Y = []
 
 if __name__ == "__main__":
+    actual_time = time.time()
     training_dataset = Dataset(calculate_preprocessors=True, end=10000)
+    new_time = time.time()
+    print "Time spent in building the tfidf and cv: "+str(new_time-actual_time)
     validation_dataset = Dataset(calculate_preprocessors=False,
                                  preprocessors=(training_dataset.tfidf, training_dataset.cv),
                                  start=10000, end=20000)
