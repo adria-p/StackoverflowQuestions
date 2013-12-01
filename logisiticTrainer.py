@@ -1,6 +1,6 @@
 from brummlearn.glm import GeneralizedLinearSparseModel
 import climin
-from scipy.sparse import vstack
+from scipy.sparse import csr_matrix
 import climin.stops
 import numpy as np
 import time
@@ -16,22 +16,40 @@ class LogisticTrainer(object):
         self.feature_size = feature_size
         self.tags_per_example = tags_per_example
 
+    def get_validation_data(self):
+        indices_VX = []
+        data_VX = []
+        indptr_VX = []
+        VZ = []
+        first = True
+        for (new_data, new_indices, new_indptr), vz in self.eval_data:
+            if len(vz) != 0:
+                indices_VX.append(new_indices)
+                data_VX.append(new_data)
+                if first:
+                    indptr_VX.append(new_indptr)
+                    first = False
+                else:
+                    indptr_VX.append(indptr_VX[-1][-1]+new_indptr[1:])
+                VZ.append(vz)
+        indptr_VX = np.concatenate(indptr_VX)
+        data_VX = np.concatenate(data_VX)
+        indices_VX = np.concatenate(indices_VX)
+        VZ = np.concatenate(VZ, axis=0)
+        VX = csr_matrix((data_VX, indices_VX, indptr_VX),
+                        shape=(len(VZ), self.feature_size),
+                        dtype=np.float64)
+        return VX, VZ
+
     def run(self):
-        num_examples = 50
+        num_examples = 5
         batch_size = num_examples*self.tags_per_example
         max_iter = 3000
         actual_time = time.time()
         new_time = time.time()
         print "Time spent in transforming the training dataset: "+str(new_time-actual_time)
         actual_time = new_time
-        VX = []
-        VZ = []
-        for vx, vz in self.eval_data:
-            if len(vz) != 0:
-                VX.append(vx)
-                VZ.append(vz)
-        VX = vstack(VX, format="csr")
-        VZ = np.concatenate(VZ, axis=0)
+        VX, VZ = self.get_validation_data()
         new_time = time.time()
         print "Time spent in transforming the validation dataset: "+str(new_time-actual_time)
         stop = climin.stops.any_([
