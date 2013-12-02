@@ -177,14 +177,14 @@ class ValidationDataset(Dataset):
 
 if __name__ == "__main__":
     actual_time = time.time()
-    tags_per_example = 4000
+    tags_per_example = 5000
     unbalance = (True, tags_per_example)
-    training_dataset = Dataset(calculate_preprocessors=True, end=800, unbalance=unbalance)
+    training_dataset = Dataset(calculate_preprocessors=False, end=2000000, unbalance=unbalance)
     new_time = time.time()
     print "Time spent in building the tfidf and cv: "+str(new_time-actual_time)
     validation_dataset = Dataset(calculate_preprocessors=False, unbalance=unbalance,
                                  preprocessors=(training_dataset.tfidf, training_dataset.cv),
-                                 start=100000, end=100005)
+                                 start=5000000, end=5001000)
     lt = LogisticTrainer(training_dataset, validation_dataset,
                          len(training_dataset.tfidf.vocabulary_)+len(training_dataset.cv.vocabulary_),
                          tags_per_example)
