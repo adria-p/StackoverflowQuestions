@@ -5,6 +5,7 @@ import climin.stops
 import numpy as np
 import time
 
+
 __author__ = 'kosklain'
 
 
@@ -58,7 +59,7 @@ class LogisticTrainer(object):
             climin.stops.after_n_iterations(max_iter),
             ])
         pause = climin.stops.modulo_n_iterations(10)
-        optimizer = 'rmsprop', {'steprate': 0.0001, 'momentum': 0.9, 'decay': 0.9, 'step_adapt': 0.01}
+        optimizer = 'rmsprop', {'steprate': 0.0001, 'momentum': 0.9, 'decay': 0.9, 'step_adapt': False} #0.01
         m = GeneralizedLinearSparseModel(self.feature_size, 1, out_transfer='sigmoid', loss='fmeasure',
                                          optimizer=optimizer, batch_size=batch_size, max_iter=max_iter,
                                          num_examples=num_examples)
@@ -85,5 +86,6 @@ class LogisticTrainer(object):
             #img = tile_raster_images(fe.parameters['in_to_hidden'].T, image_dims, feature_dims, (1, 1))
             #save_and_display(img, 'filters-%i.png' % i)
 
+            np.save("params"+time.strftime("%Y%m%d-%H%M%S"), info['best_pars'])
             row = '%i' % i, '%.6f' % (1-info['val_loss']), '%.6f' % m.parameters['bias']#, '%.6f' % info['step_length']
             print '   '.join(i.ljust(max_len) for i in row)

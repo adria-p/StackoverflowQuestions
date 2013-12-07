@@ -4,8 +4,9 @@ import csv
 import re
 
 class CsvCleaner:
-    def __init__(self, csv_file, start=0, end=-1, detector_mode=False, report_every=0, only_tags=False):
+    def __init__(self, csv_file, start=0, end=-1, detector_mode=False, report_every=0, only_tags=False, testing=False):
         self.csv = csv_file
+        self.testing = testing
         self.only_tags=only_tags
         self.report_every = report_every
         self.detector_mode = detector_mode
@@ -114,7 +115,10 @@ class CsvCleaner:
             if current_line > self.end_reading:
                 if self.end_reading != -1:
                     break
-            [_, title, body, tags] = line
+            if self.testing:
+                [_, title, body] = line
+            else:
+                [_, title, body, tags] = line
             body = body.lower()
             title = self.get_final_string(title.lower())
             if not self.only_tags:
