@@ -16,12 +16,12 @@ class TestDataset(Dataset):
                        report_every=10000, start=self.start,
                        end=self.end, only_tags=False, testing=True)
         return X
+
     def __iter__(self):
         TX = self.get_raw_data()
         offset = len(self.tfidf.vocabulary_)
         num_tags = len(self.cv.vocabulary_)
         for tx in TX:
-
             x = self.tfidf.transform([tx])
             labels = np.arange(offset, offset+num_tags)
             data_to_add = np.concatenate((x.data, [1]), axis=0)
@@ -41,5 +41,5 @@ if __name__ == "__main__":
     new_time = time.time()
     print "Time spent in building the tfidf and cv: "+str(new_time-actual_time)
     lt = LogisticPredictor(testing_dataset, len(testing_dataset.tfidf.vocabulary_) + len(testing_dataset.cv.vocabulary_),
-                                            len(testing_dataset.cv.vocabulary_))
+                                            len(testing_dataset.cv.vocabulary_), "params20131210-222533.npy")
     lt.run()

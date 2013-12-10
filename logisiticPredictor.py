@@ -56,13 +56,15 @@ class LogisticPredictor(object):
         c_wd = 0.001
         m.exprs['loss'] = m.exprs['loss'] + c_wd * weight_decay
 
-        m.parameters = np.load(self.parameters_file)
+        m.parameters.data = np.load(self.parameters_file)
 
+        tags = np.array(self.eval_data.cv.get_feature_names())
         for (data, indices, indptr) in self.eval_data:
             TX = csr_matrix((data, indices, indptr),
                         shape=(self.num_tags, self.feature_size),
                         dtype=np.float64)
-            selected_tags = self.eval_data.cv.get_feature_names()[m.predict(TX) == 1]
+            predictions = np.array(m.predict(TX)).flatten()
+            selected_tags = tags[predictions > 0.5]
             print selected_tags
 
 
