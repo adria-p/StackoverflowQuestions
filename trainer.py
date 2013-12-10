@@ -53,38 +53,6 @@ class Dataset(object):
         joblib.dump(cv, self.labels_preprocessor)
         return tfidf, cv
 
-    def get_final_testing_data(self, X, Y):
-        num_tags = Y.shape[1]
-        offset = X.shape[1]
-        targets = np.zeros(num_tags*Y.shape[0])
-        current_row = 0
-        new_indices = []
-        new_data = []
-        new_indptr = [0]
-        last_indptr = 0
-        for x, y in zip(X, Y):
-            _, labels = y.nonzero()
-            labels += offset
-            data_to_add = np.concatenate((x.data,[1]), axis=0)
-            new_data.extend(np.repeat(data_to_add, len(labels)))
-            indptr_to_add = x.indptr[-1]+1
-            for label in range(offset, offset+num_tags):
-                targets[current_row] = 1 if label in labels else -1
-                new_indices.extend(np.concatenate((x.indices, [label])))
-                last_indptr += indptr_to_add
-                new_indptr.append(last_indptr)
-                current_row += 1
-        training = self.build_matrix((new_data, new_indices, new_indptr),
-                                     (num_tags, Y.shape[1]+X.shape[1]))
-        #targets = targets.reshape(targets.shape[0], 1)
-        f = open(self.data_final_test, 'wb')
-        cPickle.dump(training, f)
-        f.close()
-        f = open(self.target_final_test, 'wb')
-        cPickle.dump(targets, f)
-        f.close()
-        return training, targets
-
     def shuffle_sparse_matrices(self, start, stop, matrix1, matrix2):
         indices = np.arange(start, stop, dtype=np.int32)
         np.random.shuffle(indices)
@@ -108,13 +76,6 @@ class Dataset(object):
     def get_projected_data(self, X):
         P = self.get_projection_matrix(X.shape[1], 4000)
         return X.dot(P)
-
-    def run(self):
-        print "Num examples: %d" % (self.end - self.start)
-        actual_time = time.time()
-        self.tfidf, self.cv = self.get_preprocessors()
-        new_time = time.time()
-        print "Time spent in building the preprocessors: "+str(new_time-actual_time)
 
     def __iter__(self):
         X, Y = self.get_raw_data()
@@ -147,33 +108,7 @@ class Dataset(object):
             yield (new_data, new_indices, new_indptr), targets
 
 
-class ValidationDataset(Dataset):
-    def __iter__(self):
-        X, Y = self.get_raw_data()
-        offset = len(self.tfidf.vocabulary_)
-        y_range = len(self.cv.vocabulary_)
-        for tx, ty in izip(X, Y):
-            x = self.tfidf.transform([tx])
-            y = self.cv.transform([ty])
-            new_indices = []
-            new_data = []
-            new_indptr = [0]
-            last_indptr = 0
-            labels = np.arange(y_range)
-            labels += offset
-            data_to_add = np.concatenate((x.data, [1]), axis=0)
-            new_data.extend(np.repeat(data_to_add, len(labels)))
-            indptr_to_add = x.indptr[-1]+1
-            targets = np.zeros(len(self.cv.vocabulary_), 1)
-            targets[y.indices][0] = 2
-            targets -= 1
-            for label in labels:
-                new_indices.extend(np.concatenate((x.indices, [label])))
-                last_indptr += indptr_to_add
-                new_indptr.append(last_indptr)
-            training = self.build_matrix((new_data, new_indices, new_indptr),
-                                        (len(labels), offset+y_range))
-            yield training, targets, tx, ty
+
 
 if __name__ == "__main__":
     actual_time = time.time()
