@@ -2,7 +2,7 @@ from brummlearn.glm import GeneralizedLinearSparseModel
 from scipy.sparse import csr_matrix
 import numpy as np
 import time
-
+import csv
 
 __author__ = 'kosklain'
 
@@ -58,13 +58,29 @@ class LogisticPredictor(object):
 
         m.parameters.data = np.load(self.parameters_file)
 
+        repeated_train = np.load("repeated_train.npy")
+        repeated_test = np.load("repeated_test.npy")
+        repeated_test_num = 0
+
+
+        csv_reader_train = csv.reader(open("Train_clean2.csv"))
+        csv_submission = csv.writer(open("submission.csv", "w"))
+        csv_submission.writerow(["Id", "Tags"])
+        offset = 6034196
+        next(csv_reader_train)
+        train_tags = [line[3] for line in csv_reader_train]
         tags = np.array(self.eval_data.cv.get_feature_names())
-        for (data, indices, indptr) in self.eval_data:
-            TX = csr_matrix((data, indices, indptr),
-                        shape=(self.num_tags, self.feature_size),
-                        dtype=np.float64)
-            predictions = np.array(m.predict(TX)).flatten()
-            selected_tags = tags[predictions > 0.5]
-            print selected_tags
+        for i, (data, indices, indptr) in enumerate(self.eval_data):
+            if repeated_test[repeated_test_num] == i:
+                tags = train_tags[repeated_train[repeated_test_num]]
+                repeated_test_num += 1
+            else:
+                TX = csr_matrix((data, indices, indptr),
+                            shape=(self.num_tags, self.feature_size),
+                            dtype=np.float64)
+                predictions = np.array(m.predict(TX)).flatten()
+                tags = tags[predictions > 0.5]
+            print tags
+            csv_submission.writerow([offset+i, tags])
 
 
