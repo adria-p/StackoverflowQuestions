@@ -72,15 +72,15 @@ class LogisticPredictor(object):
         tags = np.array(self.eval_data.cv.get_feature_names())
         for i, (data, indices, indptr) in enumerate(self.eval_data):
             if repeated_test[repeated_test_num] == i:
-                tags = train_tags[repeated_train[repeated_test_num]]
+                selected_tags = train_tags[repeated_train[repeated_test_num]]
                 repeated_test_num += 1
             else:
                 TX = csr_matrix((data, indices, indptr),
                             shape=(self.num_tags, self.feature_size),
                             dtype=np.float64)
                 predictions = np.array(m.predict(TX)).flatten()
-                tags = tags[predictions > 0.5]
+                selected_tags = tags[predictions > 0.5]
             print tags
-            csv_submission.writerow([offset+i, tags])
+            csv_submission.writerow([offset+i, selected_tags])
 
 
