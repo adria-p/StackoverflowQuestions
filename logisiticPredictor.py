@@ -80,7 +80,10 @@ class LogisticPredictor(object):
                             dtype=np.float64)
                 predictions = np.array(m.predict(TX)).flatten()
                 selected_tags = tags[predictions > 0.5]
-            print tags
+                selected_tags = " ".join(selected_tags)
+
+            selected_tags = "\""+selected_tags+"\""
+            print selected_tags
             csv_submission.writerow([offset+i, selected_tags])
 
 
