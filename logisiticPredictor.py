@@ -63,8 +63,9 @@ class LogisticPredictor(object):
         repeated_test_num = 0
 
 
-        csv_reader_train = csv.reader(open("Train_clean2.csv"))
-        csv_submission = csv.writer(open("submission.csv", "w"))
+        #csv_reader_train = csv.reader(open("Train_clean2.csv"))
+        csv_reader_train = csv.reader(open("Train.csv"))
+        csv_submission = csv.writer(open("submission.csv", "w"), quoting=csv.QUOTE_NONNUMERIC)
         csv_submission.writerow(["Id", "Tags"])
         offset = 6034196
         next(csv_reader_train)
@@ -81,8 +82,6 @@ class LogisticPredictor(object):
                 predictions = np.array(m.predict(TX)).flatten()
                 selected_tags = tags[predictions > 0.5]
                 selected_tags = " ".join(selected_tags)
-
-            selected_tags = "\""+selected_tags+"\""
             print selected_tags
             csv_submission.writerow([offset+i, selected_tags])
 
