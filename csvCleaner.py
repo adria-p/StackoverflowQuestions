@@ -4,7 +4,8 @@ import csv
 import re
 
 class CsvCleaner:
-    def __init__(self, csv_file, start=0, end=-1, detector_mode=False, report_every=0, only_tags=False, testing=False):
+    def __init__(self, csv_file, start=0, end=-1, detector_mode=False, report_every=0,
+                 only_tags=False, testing=False, repeated_test=None):
         self.csv = csv_file
         self.testing = testing
         self.only_tags=only_tags
@@ -16,19 +17,23 @@ class CsvCleaner:
         self.pre = re.compile("<pre(?:\s.*?)*?>(.*?)</pre>", re.S)
         self.code = re.compile("<code>(.*?)</code>", re.S)
         self.li = re.compile("<li(?:\s.*?)*?>(.*?)</li>", re.S)
+        self.repeated_test = repeated_test
         self.stats = [0,0,0,0,0,0]
         self.characters = [0,0,0]
+        self.number_test = 0
         self.tags_found = []
+        self.number_spelling = [(re.compile("1"), "one "), (re.compile("2"), "two "),
+                       (re.compile("3"), "three "), (re.compile("4"), "four "),
+                       (re.compile("5"), "five "), (re.compile("6"), "six "),
+                       (re.compile("7"), "seven "), (re.compile("8"), "eight "),
+                       (re.compile("9"), "nine "), (re.compile("0"), "zero ")]
+
         self.tags_to_remove = [(re.compile("&lt;"), "<"), (re.compile("&gt;"), ">"), (re.compile("<.*?>"), ""),
                                (re.compile("\[.*?\]"), ""), #(re.compile("\(.*?\)"), ""),
                                (re.compile("\{.*?\}"), ""), (re.compile("[^a-z0-9]"), " "),
                                (re.compile(" [0-9 ]* "), self.spell_numbers)]
 
-        self.number_spelling = [(re.compile("1"), "one "), (re.compile("2"), "two "),
-                               (re.compile("3"), "three "), (re.compile("4"), "four "),
-                               (re.compile("5"), "five "), (re.compile("6"), "six "),
-                               (re.compile("7"), "seven "), (re.compile("8"), "eight "),
-                               (re.compile("9"), "nine "), (re.compile("0"), "zero ")]
+
 
     def spell_numbers(self, matchobj):
         final_obj = matchobj.group(0)
@@ -106,8 +111,9 @@ class CsvCleaner:
         csv_file = open(self.csv)
         csv_reader = csv.reader(csv_file)
         current_line = 0
-        for line in csv_reader:
+        for i, line in enumerate(csv_reader):
             current_line += 1
+
             if current_line == 1 or current_line < self.start_reading+1:
                 continue
             if self.report_every != 0 and current_line % self.report_every == 0:
@@ -115,6 +121,10 @@ class CsvCleaner:
             if current_line > self.end_reading:
                 if self.end_reading != -1:
                     break
+            if self.repeated_test is not None:
+                if self.repeated_test[self.number_test] == (i-1):
+                    self.number_test += 1
+                    continue
             if self.testing:
                 [_, title, body] = line
             else:

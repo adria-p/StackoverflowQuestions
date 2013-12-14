@@ -68,36 +68,21 @@ class LogisticPredictor(object):
 
         m.parameters.data = np.load(self.parameters_file)
 
-        self.repeated_train = np.load("repeated_train.npy")
-        self.repeated_test = np.load("repeated_test.npy")
-
-        #csv_reader_train = csv.reader(open("Train_clean2.csv"))
-        csv_reader_train = csv.reader(open("Train.csv"))
         csv_submission = csv.writer(open("submission.csv", "w"), quoting=csv.QUOTE_NONNUMERIC)
-        csv_submission.writerow(["Id", "Tags"])
+        csv_submission.writerow(["Tags"])
 
-        next(csv_reader_train)
-        self.train_tags = [line[3] for line in csv_reader_train]
         self.tags = np.array(self.eval_data.cv.get_feature_names())
 
         pool = Pool(processes=4)
-        result = pool.map(unwrap_self_f, izip(self.self_returner(), enumerate(self.eval_data)))
+        result = pool.map(unwrap_self_f, izip(self.self_returner(), self.eval_data))
         csv_submission.writerows(result)
 
     def predict_tags(self, data_to_predict):
-        offset = 6034196
-        i, (data, indices, indptr) = data_to_predict
-        try:
-            idx = self.repeated_test.index(i)
-            selected_tags = self.train_tags[self.repeated_train[idx]]
-        except ValueError:
-            TX = csr_matrix((data, indices, indptr),
-                        shape=(self.num_tags, self.feature_size),
-                        dtype=np.float64)
-            predictions = np.array(self.m.predict(TX)).flatten()
-            selected_tags = self.tags[predictions > 0.5]
-            selected_tags = " ".join(selected_tags)
-        return [offset+i, selected_tags]
-
-
-
+        data, indices, indptr = data_to_predict
+        TX = csr_matrix((data, indices, indptr),
+                    shape=(self.num_tags, self.feature_size),
+                    dtype=np.float64)
+        predictions = np.array(self.m.predict(TX)).flatten()
+        selected_tags = self.tags[predictions > 0.5]
+        selected_tags = " ".join(selected_tags)
+        return [selected_tags]

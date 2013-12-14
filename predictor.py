@@ -9,12 +9,14 @@ __author__ = 'apuigdom'
 class TestDataset(Dataset):
     def __init__(self, raw_data_file="Test.csv", preprocessors=None):
         super(TestDataset, self).__init__(raw_data_file=raw_data_file, end=-1,
-                                          calculate_preprocessors=False, preprocessors=preprocessors)
+                                          calculate_preprocessors=False,
+                                          preprocessors=preprocessors)
 
     def get_raw_data(self):
         X = CsvCleaner(self.raw_data_file, detector_mode=False,
                        report_every=10000, start=self.start,
-                       end=self.end, only_tags=False, testing=True)
+                       end=self.end, only_tags=False, testing=True,
+                       repeated_test=np.load("repeated_test.npy"))
         return X
 
     def __iter__(self):
@@ -41,5 +43,5 @@ if __name__ == "__main__":
     new_time = time.time()
     print "Time spent in building the tfidf and cv: "+str(new_time-actual_time)
     lt = LogisticPredictor(testing_dataset, len(testing_dataset.tfidf.vocabulary_) + len(testing_dataset.cv.vocabulary_),
-                                            len(testing_dataset.cv.vocabulary_), "params20131210-222533.npy")
+                           len(testing_dataset.cv.vocabulary_), "params20131210-222533.npy")
     lt.run()
