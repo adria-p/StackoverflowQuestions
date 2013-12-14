@@ -2,6 +2,8 @@ import csv
 import numpy as np
 import sys
 from multiprocessing import Pool
+import pandas as pd
+
 def check_testing_repeated():
     print "Starting to store titles"
     csv_reader_train = csv.reader(open("Train.csv"))
@@ -33,20 +35,9 @@ def check_testing_repeated():
     np.save("repeated_train", final_index_array_train)
 
 def check_train_repeated():
-    csv_reader_train = csv.reader(open("Train.csv"))
-    csv_reader_train2 = csv.writer(open("Train_clean2.csv", "w"))
-    titles = []
-    repeated = 0
-    for i, line in enumerate(csv_reader_train):
-        if line[1] not in titles:
-            csv_reader_train2.writerow(line)
-            titles.append(line[1])
-        else:
-            repeated += 1
-            if (repeated % 1000) == 0:
-                print "Repeated %d in %d" % (repeated, i)
-    print "Done with titles in training"
-    csv_reader_train2.close()
-    csv_reader_train.close()
+    train = pd.read_csv("Train.csv", index_col=0)
+    train_deduplicated = train.drop_duplicates(cols="Title")
+    train_deduplicated.to_csv("Train_clean2.csv", index="Id", quoting=csv.QUOTE_NONNUMERIC)
+
 
 check_train_repeated()

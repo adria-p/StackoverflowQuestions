@@ -1,10 +1,14 @@
+import csv
+from multiprocessing import Pool
+from brummlearn.glm import GeneralizedLinearSparseModel
+from scipy.sparse import csr_matrix
 from csvCleaner import CsvCleaner
-from logisiticPredictor import LogisticPredictor
 from trainer import Dataset
 import numpy as np
 import time
 
 __author__ = 'apuigdom'
+
 
 class TestDataset(Dataset):
     def __init__(self, raw_data_file="Test.csv", preprocessors=None):
@@ -37,11 +41,53 @@ class TestDataset(Dataset):
             yield (new_data, new_indices, new_indptr)
 
 
+def predict_tags(self, data_to_predict):
+    data, indices, indptr = data_to_predict
+    TX = csr_matrix((data, indices, indptr),
+                shape=(self.num_tags, self.feature_size),
+                dtype=np.float64)
+    predictions = np.array(self.m.predict(TX)).flatten()
+    selected_tags = self.tags[predictions > 0.5]
+    selected_tags = " ".join(selected_tags)
+    return [selected_tags]
+
 if __name__ == "__main__":
     actual_time = time.time()
     testing_dataset = TestDataset()
     new_time = time.time()
     print "Time spent in building the tfidf and cv: "+str(new_time-actual_time)
-    lt = LogisticPredictor(testing_dataset, len(testing_dataset.tfidf.vocabulary_) + len(testing_dataset.cv.vocabulary_),
-                           len(testing_dataset.cv.vocabulary_), "params20131210-222533.npy")
-    lt.run()
+
+    feature_size = len(testing_dataset.tfidf.vocabulary_) + len(testing_dataset.cv.vocabulary_)
+    num_tags = len(testing_dataset.cv.vocabulary_)
+    parameters_file = "params20131210-222533.npy"
+
+    num_examples = 20
+    batch_size = num_examples*num_tags
+    max_iter = 3000
+    actual_time = time.time()
+    new_time = time.time()
+    print "Time spent in transforming the training dataset: "+str(new_time-actual_time)
+    actual_time = new_time
+    new_time = time.time()
+    print "Time spent in transforming the validation dataset: "+str(new_time-actual_time)
+    optimizer = 'rmsprop', {'steprate': 0.0001, 'momentum': 0.9, 'decay': 0.9, 'step_adapt': False} #0.01
+
+    m = GeneralizedLinearSparseModel(feature_size, 1, out_transfer='sigmoid', loss='fmeasure',
+                                     optimizer=optimizer, batch_size=batch_size, max_iter=max_iter,
+                                     num_examples=num_examples)
+    weight_decay = ((m.parameters.in_to_out ** 2).sum())# + (m.parameters.bias**2).sum())
+    weight_decay /= m.exprs['inpt'].shape[0]
+    m.exprs['true_loss'] = m.exprs['loss']
+    c_wd = 0.001
+    m.exprs['loss'] = m.exprs['loss'] + c_wd * weight_decay
+
+    m.parameters.data = np.load(parameters_file)
+
+    csv_submission = csv.writer(open("submission.csv", "w"), quoting=csv.QUOTE_NONNUMERIC)
+    csv_submission.writerow(["Tags"])
+
+    tags = np.array(testing_dataset.cv.get_feature_names())
+
+    pool = Pool(processes=4)
+    result = pool.map(predict_tags, testing_dataset)
+    csv_submission.writerows(result)
