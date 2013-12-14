@@ -41,13 +41,13 @@ class TestDataset(Dataset):
             yield (new_data, new_indices, new_indptr)
 
 
-def predict_tags(self, data_to_predict):
+def predict_tags(data_to_predict):
     data, indices, indptr = data_to_predict
     TX = csr_matrix((data, indices, indptr),
-                shape=(self.num_tags, self.feature_size),
+                shape=(num_tags, feature_size),
                 dtype=np.float64)
-    predictions = np.array(self.m.predict(TX)).flatten()
-    selected_tags = self.tags[predictions > 0.5]
+    predictions = np.array(m.predict(TX)).flatten()
+    selected_tags = tags[predictions > 0.5]
     selected_tags = " ".join(selected_tags)
     return [selected_tags]
 
@@ -55,11 +55,12 @@ if __name__ == "__main__":
     actual_time = time.time()
     testing_dataset = TestDataset()
     new_time = time.time()
+    t = [x for x in testing_dataset]
     print "Time spent in building the tfidf and cv: "+str(new_time-actual_time)
 
     feature_size = len(testing_dataset.tfidf.vocabulary_) + len(testing_dataset.cv.vocabulary_)
     num_tags = len(testing_dataset.cv.vocabulary_)
-    parameters_file = "params20131210-222533.npy"
+    parameters_file = "params20131209-223018.npy"
 
     num_examples = 20
     batch_size = num_examples*num_tags
@@ -89,5 +90,6 @@ if __name__ == "__main__":
     tags = np.array(testing_dataset.cv.get_feature_names())
 
     pool = Pool(processes=4)
-    result = pool.map(predict_tags, testing_dataset)
+    result = pool.map(predict_tags, t)
+    #result = [predict_tags(x) for x in testing_dataset]
     csv_submission.writerows(result)
