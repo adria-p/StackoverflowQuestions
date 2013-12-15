@@ -55,7 +55,6 @@ if __name__ == "__main__":
     actual_time = time.time()
     testing_dataset = TestDataset()
     new_time = time.time()
-    t = [x for x in testing_dataset]
     print "Time spent in building the tfidf and cv: "+str(new_time-actual_time)
 
     feature_size = len(testing_dataset.tfidf.vocabulary_) + len(testing_dataset.cv.vocabulary_)
@@ -90,6 +89,6 @@ if __name__ == "__main__":
     tags = np.array(testing_dataset.cv.get_feature_names())
 
     pool = Pool(processes=4)
-    result = pool.map(predict_tags, t)
+    result = pool.imap(predict_tags, testing_dataset)
     #result = [predict_tags(x) for x in testing_dataset]
     csv_submission.writerows(result)
