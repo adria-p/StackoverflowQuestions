@@ -1,7 +1,7 @@
 import csv
 from multiprocessing import Pool
 from brummlearn.glm import GeneralizedLinearSparseModel
-from scipy.sparse import csr_matrix
+from scipy.sparse import csr_matrix, vstack
 from csvCleaner import CsvCleaner
 from trainer import Dataset
 import numpy as np
@@ -9,6 +9,33 @@ import time
 
 __author__ = 'apuigdom'
 
+
+
+def transform_array(tx):
+    x = tfidf.transform([tx])
+    labels = np.arange(offset, offset+num_tags)
+    data_to_add = np.concatenate((x.data, [1]), axis=0)
+    new_data = np.repeat(data_to_add, len(labels))
+    indptr_to_add = x.indptr[-1]+1
+    new_indptr = np.arange((1+len(labels))*indptr_to_add, step=indptr_to_add)
+    labels = labels.reshape((len(labels), 1))
+    new_indices = np.repeat(x.indices.reshape((1, len(x.indices))), len(labels), axis=0)
+    new_indices = np.concatenate((new_indices, labels), axis=1)
+    new_indices = new_indices.flatten()
+    return [new_data, new_indices, new_indptr]
+
+def predict_tags(data_to_predict):
+    data, indices, indptr = data_to_predict
+    TX = csr_matrix((data, indices, indptr),
+                shape=(num_tags, feature_size),
+                dtype=np.float64)
+    predictions = np.array(m.predict(TX)).reshape(-1, num_tags)
+    sel = []
+    for pred in predictions:
+        selected_tags = tags[pred > 0.5]
+        selected_tags = " ".join(selected_tags)
+        sel.append(selected_tags)
+    return sel
 
 class TestDataset(Dataset):
     def __init__(self, raw_data_file="Test.csv", preprocessors=None):
@@ -25,40 +52,44 @@ class TestDataset(Dataset):
 
     def __iter__(self):
         TX = self.get_raw_data()
-        offset = len(self.tfidf.vocabulary_)
-        num_tags = len(self.cv.vocabulary_)
+        batch = 4
+        tx_array = []
+        pool = Pool(processes=4)
         for tx in TX:
-            x = self.tfidf.transform([tx])
-            labels = np.arange(offset, offset+num_tags)
-            data_to_add = np.concatenate((x.data, [1]), axis=0)
-            new_data = np.repeat(data_to_add, len(labels))
-            indptr_to_add = x.indptr[-1]+1
-            new_indptr = np.arange((1+len(labels))*indptr_to_add, step=indptr_to_add)
-            labels = labels.reshape((len(labels), 1))
-            new_indices = np.repeat(x.indices.reshape((1, len(x.indices))), len(labels), axis=0)
-            new_indices = np.concatenate((new_indices, labels), axis=1)
-            new_indices = new_indices.flatten()
-            yield (new_data, new_indices, new_indptr)
+            tx_array.append(tx)
+            if len(tx_array) == batch:
+                result = np.array(pool.map(transform_array, tx_array))
+                new_data, new_indices, new_indptr = zip(*result)
+                new_data = np.concatenate(new_data)
+                new_indices = np.concatenate(new_indices[0])
+                indptr = new_indptr[0]
+                for ind in new_indptr[1:]:
+                    indptr = np.concatenate((indptr,ind[1:]+indptr[-1]))
+                yield new_data, new_indices, indptr
+                tx_array = []
+        result = np.array(pool.map(transform_array, tx_array))
+        new_data, new_indices, new_indptr = zip(*result)
+        new_data = np.concatenate(new_data)
+        new_indices = np.concatenate(new_indices[0])
+        indptr = new_indptr[0]
+        for ind in new_indptr[1:]:
+            indptr = np.concatenate((indptr, ind[1:]+indptr[-1]))
+        yield new_data, new_indices, indptr
 
 
-def predict_tags(data_to_predict):
-    data, indices, indptr = data_to_predict
-    TX = csr_matrix((data, indices, indptr),
-                shape=(num_tags, feature_size),
-                dtype=np.float64)
-    predictions = np.array(m.predict(TX)).flatten()
-    selected_tags = tags[predictions > 0.5]
-    selected_tags = " ".join(selected_tags)
-    return [selected_tags]
 
 if __name__ == "__main__":
     actual_time = time.time()
     testing_dataset = TestDataset()
+    tfidf = testing_dataset.tfidf
+    offset = len(tfidf.vocabulary_)
+    num_tags = len(testing_dataset.cv.vocabulary_)
+
     new_time = time.time()
     print "Time spent in building the tfidf and cv: "+str(new_time-actual_time)
 
     feature_size = len(testing_dataset.tfidf.vocabulary_) + len(testing_dataset.cv.vocabulary_)
-    num_tags = len(testing_dataset.cv.vocabulary_)
+
     parameters_file = "params20131209-223018.npy"
 
     num_examples = 20
@@ -88,7 +119,5 @@ if __name__ == "__main__":
 
     tags = np.array(testing_dataset.cv.get_feature_names())
 
-    pool = Pool(processes=4)
-    result = pool.imap(predict_tags, testing_dataset)
-    #result = [predict_tags(x) for x in testing_dataset]
+    result = [[i] for x in testing_dataset for i in predict_tags(x)]
     csv_submission.writerows(result)

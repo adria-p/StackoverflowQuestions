@@ -31,6 +31,8 @@ class Dataset(object):
         self.data_preprocessor = data_prefix+preprocessor_suffix
         self.labels_preprocessor = labels_prefix+preprocessor_suffix
         self.tfidf, self.cv = self.get_preprocessors(calculate_preprocessors) if preprocessors is None else preprocessors
+        self.labels_distribution = np.load("distribution.npy")
+        self.labels_distribution_inverse = np.load("distribution_inverse.npy")
 
     def get_raw_data(self):
         X = CsvCleaner(self.raw_data_file, detector_mode=False,
@@ -81,18 +83,17 @@ class Dataset(object):
         X, Y = self.get_raw_data()
         offset = len(self.tfidf.vocabulary_)
         random_range = len(self.cv.vocabulary_)
+        random_range2 = len(self.labels_distribution)
         for tx, ty in izip(X, Y):
             x = self.tfidf.transform([tx])
             y = self.cv.transform([ty])
             _, true_labels = y.nonzero()
-            if self.fixed_unbalance:
-                random_labels = np.random.randint(random_range - len(true_labels),
-                                                  size=self.unbalance_amount-len(true_labels))
-            else:
-                random_labels = np.random.randint(random_range - len(true_labels),
-                                                  size=self.unbalance_amount*len(true_labels))
-            for label in true_labels:
-                random_labels[random_labels >= label] += 1
+            indices = self.labels_distribution
+            for label in np.sort(true_labels):
+                indices = np.delete(indices, slice(self.labels_distribution_inverse[label],
+                                    self.labels_distribution_inverse[label+1]))
+            random_labels = np.random.randint(len(indices),
+                                              size=self.unbalance_amount-len(true_labels))
             labels = np.concatenate((true_labels, random_labels))
             labels += offset
             data_to_add = np.concatenate((x.data, [1]), axis=0)

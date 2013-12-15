@@ -1,5 +1,6 @@
 from sklearn.externals import joblib
 from csvCleaner import CsvCleaner
+import numpy as np
 
 __author__ = 'kosklain'
 
@@ -26,10 +27,21 @@ class DistributionCounter(object):
         levels = len(self.cv.vocabulary_)
         for ty in Y:
             y = self.cv.transform([ty])
-            yield y
+            yield y.indices
 
 
 if __name__ == "__main__":
     dc = DistributionCounter()
-    for x in dc:
-        print x
+    final_array = [i for x in dc for i in x]
+    final_array = np.array(final_array)
+    final_array = np.sort(final_array)
+    np.save("distribution", final_array)
+    dist_inverse = [0]
+    current = final_array[0]
+    for i, x in enumerate(final_array):
+        if x != current:
+            current = x
+            dist_inverse.append(i)
+    dist_inverse.append(len(final_array))
+    dist_inverse = np.array(dist_inverse)
+    np.save("distribution_inverse", dist_inverse)
