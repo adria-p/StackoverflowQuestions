@@ -10,20 +10,6 @@ import time
 __author__ = 'apuigdom'
 
 
-
-def transform_array(tx):
-    x = tfidf.transform([tx])
-    labels = np.arange(offset, offset+num_tags)
-    data_to_add = np.concatenate((x.data, [1]), axis=0)
-    new_data = np.repeat(data_to_add, len(labels))
-    indptr_to_add = x.indptr[-1]+1
-    new_indptr = np.arange((1+len(labels))*indptr_to_add, step=indptr_to_add)
-    labels = labels.reshape((len(labels), 1))
-    new_indices = np.repeat(x.indices.reshape((1, len(x.indices))), len(labels), axis=0)
-    new_indices = np.concatenate((new_indices, labels), axis=1)
-    new_indices = new_indices.flatten()
-    return [new_data, new_indices, new_indptr]
-
 def predict_tags(data_to_predict):
     data, indices, indptr, num_transformed = data_to_predict
     TX = csr_matrix((data, indices, indptr),
@@ -34,7 +20,6 @@ def predict_tags(data_to_predict):
     for pred in predictions:
         selected_tags = tags[pred > 0.5]
         selected_tags = " ".join(selected_tags)
-        print selected_tags
         sel.append(selected_tags)
     return sel
 
@@ -53,39 +38,26 @@ class TestDataset(Dataset):
 
     def __iter__(self):
         TX = self.get_raw_data()
-        batch = 4
-        tx_array = []
-        pool = Pool(processes=4)
+        num_tags = len(self.cv.vocabulary_)
+        offset = len(self.tfidf.vocabulary_)
         for tx in TX:
-            tx_array.append(tx)
-            if len(tx_array) == batch:
-                result = np.array(pool.map(transform_array, tx_array))
-                new_data, new_indices, new_indptr = zip(*result)
-                num_transformed = len(new_data)
-                new_data = np.concatenate(new_data)
-                new_indices = np.concatenate(new_indices)
-                indptr = new_indptr[0]
-                for ind in new_indptr[1:]:
-                    indptr = np.concatenate((indptr,ind[1:]+indptr[-1]))
-                yield new_data, new_indices, indptr, num_transformed
-                tx_array = []
-        result = np.array(pool.map(transform_array, tx_array))
-        new_data, new_indices, new_indptr = zip(*result)
-        num_transformed = len(new_data)
-        new_data = np.concatenate(new_data)
-        new_indices = np.concatenate(new_indices)
-        indptr = new_indptr[0]
-        for ind in new_indptr[1:]:
-            indptr = np.concatenate((indptr, ind[1:]+indptr[-1]))
-        yield new_data, new_indices, indptr, num_transformed
-
-
+            x = self.tfidf.transform([tx])
+            labels = np.arange(offset, offset+num_tags)
+            data_to_add = np.concatenate((x.data, [1]), axis=0)
+            new_data = np.repeat(data_to_add.reshape((1, len(data_to_add))), len(labels), axis=0)
+            new_data = new_data.flatten()
+            indptr_to_add = x.indptr[-1]+1
+            new_indptr = np.arange((1+len(labels))*indptr_to_add, step=indptr_to_add)
+            labels = labels.reshape((len(labels), 1))
+            new_indices = np.repeat(x.indices.reshape((1, len(x.indices))), len(labels), axis=0)
+            new_indices = np.concatenate((new_indices, labels), axis=1)
+            new_indices = new_indices.flatten()
+            yield new_data, new_indices, new_indptr
 
 if __name__ == "__main__":
     actual_time = time.time()
     testing_dataset = TestDataset()
-    tfidf = testing_dataset.tfidf
-    offset = len(tfidf.vocabulary_)
+
     num_tags = len(testing_dataset.cv.vocabulary_)
 
     new_time = time.time()

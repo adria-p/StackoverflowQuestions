@@ -82,22 +82,21 @@ class Dataset(object):
     def __iter__(self):
         X, Y = self.get_raw_data()
         offset = len(self.tfidf.vocabulary_)
-        random_range = len(self.cv.vocabulary_)
-        random_range2 = len(self.labels_distribution)
         for tx, ty in izip(X, Y):
             x = self.tfidf.transform([tx])
             y = self.cv.transform([ty])
             _, true_labels = y.nonzero()
             indices = self.labels_distribution
-            for label in np.sort(true_labels):
+            for label in np.sort(true_labels)[::-1]:
                 indices = np.delete(indices, slice(self.labels_distribution_inverse[label],
                                     self.labels_distribution_inverse[label+1]))
             random_labels = np.random.randint(len(indices),
                                               size=self.unbalance_amount-len(true_labels))
-            labels = np.concatenate((true_labels, random_labels))
+            labels = np.concatenate((true_labels, self.labels_distribution[random_labels]))
             labels += offset
             data_to_add = np.concatenate((x.data, [1]), axis=0)
-            new_data = np.repeat(data_to_add, len(labels))
+            new_data = np.repeat(data_to_add.reshape((1, len(data_to_add))), len(labels), axis=0)
+            new_data = new_data.flatten()
             indptr_to_add = x.indptr[-1]+1
             new_indptr = np.arange((1+len(labels))*indptr_to_add, step=indptr_to_add)
             targets = np.ones((len(labels), 1))
@@ -113,14 +112,14 @@ class Dataset(object):
 
 if __name__ == "__main__":
     actual_time = time.time()
-    tags_per_example = 5000
+    tags_per_example = 50
     unbalance = (True, tags_per_example)
-    training_dataset = Dataset(calculate_preprocessors=False, end=4000000, unbalance=unbalance)
+    training_dataset = Dataset(calculate_preprocessors=False, end=4000, unbalance=unbalance)
     new_time = time.time()
     print "Time spent in building the tfidf and cv: "+str(new_time-actual_time)
     validation_dataset = Dataset(calculate_preprocessors=False, unbalance=unbalance,
                                  preprocessors=(training_dataset.tfidf, training_dataset.cv),
-                                 start=4000000, end=4001000)
+                                 start=4000, end=4050)
     lt = LogisticTrainer(training_dataset, validation_dataset,
                          len(training_dataset.tfidf.vocabulary_)+len(training_dataset.cv.vocabulary_),
                          tags_per_example)
