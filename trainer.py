@@ -17,7 +17,7 @@ import time
 
 class Dataset(object):
     def __init__(self, stage=0, preprocessor_suffix="preprocess.pkl",
-                 raw_data_file="Train.csv", start=0, end=30000,
+                 raw_data_file="Train_clean2.csv", start=0, end=30000,
                  calculate_preprocessors=True,
                  unbalance=(True, 50), preprocessors = None):
         self.stage = stage
