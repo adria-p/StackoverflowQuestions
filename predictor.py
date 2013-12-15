@@ -25,15 +25,16 @@ def transform_array(tx):
     return [new_data, new_indices, new_indptr]
 
 def predict_tags(data_to_predict):
-    data, indices, indptr = data_to_predict
+    data, indices, indptr, num_transformed = data_to_predict
     TX = csr_matrix((data, indices, indptr),
-                shape=(num_tags, feature_size),
+                shape=(num_tags*num_transformed, feature_size),
                 dtype=np.float64)
     predictions = np.array(m.predict(TX)).reshape(-1, num_tags)
     sel = []
     for pred in predictions:
         selected_tags = tags[pred > 0.5]
         selected_tags = " ".join(selected_tags)
+        print selected_tags
         sel.append(selected_tags)
     return sel
 
@@ -60,21 +61,23 @@ class TestDataset(Dataset):
             if len(tx_array) == batch:
                 result = np.array(pool.map(transform_array, tx_array))
                 new_data, new_indices, new_indptr = zip(*result)
+                num_transformed = len(new_data)
                 new_data = np.concatenate(new_data)
-                new_indices = np.concatenate(new_indices[0])
+                new_indices = np.concatenate(new_indices)
                 indptr = new_indptr[0]
                 for ind in new_indptr[1:]:
                     indptr = np.concatenate((indptr,ind[1:]+indptr[-1]))
-                yield new_data, new_indices, indptr
+                yield new_data, new_indices, indptr, num_transformed
                 tx_array = []
         result = np.array(pool.map(transform_array, tx_array))
         new_data, new_indices, new_indptr = zip(*result)
+        num_transformed = len(new_data)
         new_data = np.concatenate(new_data)
-        new_indices = np.concatenate(new_indices[0])
+        new_indices = np.concatenate(new_indices)
         indptr = new_indptr[0]
         for ind in new_indptr[1:]:
             indptr = np.concatenate((indptr, ind[1:]+indptr[-1]))
-        yield new_data, new_indices, indptr
+        yield new_data, new_indices, indptr, num_transformed
 
 
 
