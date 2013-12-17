@@ -90,9 +90,14 @@ class Dataset(object):
             for label in np.sort(true_labels)[::-1]:
                 indices = np.delete(indices, slice(self.labels_distribution_inverse[label],
                                     self.labels_distribution_inverse[label+1]))
-            random_labels = np.random.randint(len(indices),
-                                              size=self.unbalance_amount-len(true_labels))
-            labels = np.concatenate((true_labels, self.labels_distribution[random_labels]))
+	    random_label = np.zeros(self.unbalance_amount-len(true_labels))
+	    for i in range(self.unbalance_amount-len(true_labels)):
+		random_label_index = np.random.randint(len(indices))
+		rl = indices[random_label_index]
+		random_label[i] = rl
+		indices = np.delete(indices, slice(self.labels_distribution_inverse[rl],
+				    self.labels_distribution_inverse[rl+1]))
+            labels = np.concatenate((true_labels, random_label))
             labels += offset
             data_to_add = np.concatenate((x.data, [1]), axis=0)
             new_data = np.repeat(data_to_add.reshape((1, len(data_to_add))), len(labels), axis=0)
@@ -112,14 +117,14 @@ class Dataset(object):
 
 if __name__ == "__main__":
     actual_time = time.time()
-    tags_per_example = 50
+    tags_per_example = 5000
     unbalance = (True, tags_per_example)
-    training_dataset = Dataset(calculate_preprocessors=False, end=4000, unbalance=unbalance)
+    training_dataset = Dataset(calculate_preprocessors=False, end=3500000, unbalance=unbalance)
     new_time = time.time()
     print "Time spent in building the tfidf and cv: "+str(new_time-actual_time)
     validation_dataset = Dataset(calculate_preprocessors=False, unbalance=unbalance,
                                  preprocessors=(training_dataset.tfidf, training_dataset.cv),
-                                 start=4000, end=4050)
+                                 start=3500000, end=3501000)
     lt = LogisticTrainer(training_dataset, validation_dataset,
                          len(training_dataset.tfidf.vocabulary_)+len(training_dataset.cv.vocabulary_),
                          tags_per_example)

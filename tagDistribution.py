@@ -8,7 +8,7 @@ __author__ = 'kosklain'
 class DistributionCounter(object):
     def __init__(self, preprocessor_suffix="preprocess.pkl",
                  raw_data_file="Train_clean2.csv", start=0,
-                 end=4000):
+                 end=3500000):
         self.start = start
         self.end = end
         labels_prefix = "labels_"

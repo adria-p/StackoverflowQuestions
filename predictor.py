@@ -67,7 +67,7 @@ if __name__ == "__main__":
 
     parameters_file = "params20131209-223018.npy"
 
-    num_examples = 20
+    num_examples = 200
     batch_size = num_examples*num_tags
     max_iter = 3000
     actual_time = time.time()
