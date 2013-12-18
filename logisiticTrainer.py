@@ -43,7 +43,7 @@ class LogisticTrainer(object):
         return VX, VZ
 
     def run(self):
-        num_examples = 150
+        num_examples = 400
         batch_size = num_examples*self.tags_per_example
         max_iter = 300000
         actual_time = time.time()

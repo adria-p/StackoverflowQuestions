@@ -11,17 +11,17 @@ __author__ = 'apuigdom'
 
 
 def predict_tags(data_to_predict):
-    data, indices, indptr, num_transformed = data_to_predict
+    data, indices, indptr = data_to_predict
     TX = csr_matrix((data, indices, indptr),
-                shape=(num_tags*num_transformed, feature_size),
+                shape=(num_tags, feature_size),
                 dtype=np.float64)
-    predictions = np.array(m.predict(TX)).reshape(-1, num_tags)
-    sel = []
-    for pred in predictions:
-        selected_tags = tags[pred > 0.5]
-        selected_tags = " ".join(selected_tags)
-        sel.append(selected_tags)
-    return sel
+    predictions = np.array(m.predict(TX)).reshape(num_tags)
+    selected_tags = tags[predictions > 0.95]
+    selected_tags = " ".join(selected_tags)
+    print " "
+    print selected_tags
+    print " "
+    return selected_tags
 
 class TestDataset(Dataset):
     def __init__(self, raw_data_file="Test.csv", preprocessors=None):
@@ -65,7 +65,7 @@ if __name__ == "__main__":
 
     feature_size = len(testing_dataset.tfidf.vocabulary_) + len(testing_dataset.cv.vocabulary_)
 
-    parameters_file = "params20131209-223018.npy"
+    parameters_file = "params20131218-093927.npy"
 
     num_examples = 200
     batch_size = num_examples*num_tags
