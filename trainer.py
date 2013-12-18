@@ -46,7 +46,7 @@ class Dataset(object):
     def get_preprocessors(self, calculate):
         if not calculate:
             return joblib.load(self.data_preprocessor), joblib.load(self.labels_preprocessor)
-        tfidf = TfidfVectorizer(ngram_range=(1, 2), min_df=0.001, max_features=None)
+        tfidf = TfidfVectorizer(ngram_range=(1, 2), min_df=0.0005, max_features=None)
         cv = CountVectorizer(tokenizer=string.split)
         X, Y = self.get_raw_data()
         tfidf.fit(X)
@@ -88,8 +88,7 @@ class Dataset(object):
             _, true_labels = y.nonzero()
             transformed_labels = self.inverse_map[true_labels]
             transformed_labels = transformed_labels[transformed_labels < self.classes]
-            labels = np.arange(self.classes)
-            labels += offset
+            labels = np.arange(offset, offset+self.classes)
             data_to_add = np.concatenate((x.data, [1]), axis=0)
             new_data = np.repeat(data_to_add.reshape((1, len(data_to_add))), len(labels), axis=0)
             new_data = new_data.flatten()
@@ -115,5 +114,5 @@ if __name__ == "__main__":
                                  preprocessors=(training_dataset.tfidf, training_dataset.cv),
                                  start=3500000, end=3502000, classes=classes)
     lt = LogisticTrainer(training_dataset, validation_dataset,
-                         len(training_dataset.tfidf.vocabulary_)+len(training_dataset.cv.vocabulary_))
+                         len(training_dataset.tfidf.vocabulary_) + classes, classes)
     lt.run()

@@ -16,7 +16,7 @@ def predict_tags(data_to_predict):
                 shape=(num_tags, feature_size),
                 dtype=np.float64)
     predictions = np.array(m.predict(TX)).reshape(num_tags)
-    selected_tags = tags[predictions > 0.95]
+    selected_tags = tags[predictions > 0.5]
     selected_tags = " ".join(selected_tags)
     print " "
     print selected_tags
@@ -24,10 +24,10 @@ def predict_tags(data_to_predict):
     return selected_tags
 
 class TestDataset(Dataset):
-    def __init__(self, raw_data_file="Test.csv", preprocessors=None):
+    def __init__(self, raw_data_file="Test.csv", preprocessors=None, classes=10):
         super(TestDataset, self).__init__(raw_data_file=raw_data_file, end=-1,
                                           calculate_preprocessors=False,
-                                          preprocessors=preprocessors)
+                                          preprocessors=preprocessors, classes=classes)
 
     def get_raw_data(self):
         X = CsvCleaner(self.raw_data_file, detector_mode=False,
@@ -38,11 +38,10 @@ class TestDataset(Dataset):
 
     def __iter__(self):
         TX = self.get_raw_data()
-        num_tags = len(self.cv.vocabulary_)
         offset = len(self.tfidf.vocabulary_)
         for tx in TX:
             x = self.tfidf.transform([tx])
-            labels = np.arange(offset, offset+num_tags)
+            labels = np.arange(offset, offset+self.classes)
             data_to_add = np.concatenate((x.data, [1]), axis=0)
             new_data = np.repeat(data_to_add.reshape((1, len(data_to_add))), len(labels), axis=0)
             new_data = new_data.flatten()
@@ -55,8 +54,9 @@ class TestDataset(Dataset):
             yield new_data, new_indices, new_indptr
 
 if __name__ == "__main__":
+    classes_to_choose = 10
     actual_time = time.time()
-    testing_dataset = TestDataset()
+    testing_dataset = TestDataset(classes=classes_to_choose)
 
     num_tags = len(testing_dataset.cv.vocabulary_)
 
@@ -93,6 +93,7 @@ if __name__ == "__main__":
     csv_submission.writerow(["Tags"])
 
     tags = np.array(testing_dataset.cv.get_feature_names())
+    tags = tags[testing_dataset.inverse_map]
 
     result = [[i] for x in testing_dataset for i in predict_tags(x)]
     csv_submission.writerows(result)
