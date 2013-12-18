@@ -19,9 +19,10 @@ class Dataset(object):
     def __init__(self, stage=0, preprocessor_suffix="preprocess.pkl",
                  raw_data_file="Train_clean2.csv", start=0, end=30000,
                  calculate_preprocessors=True,
-                 unbalance=(True, 50), preprocessors = None):
+                 unbalance=(True, 50), preprocessors = None, classes=10):
         self.stage = stage
         self.start = start
+        self.classes = classes
         self.end = end
         self.raw_data_file = raw_data_file
         self.preprocessor_suffix = preprocessor_suffix
@@ -31,8 +32,7 @@ class Dataset(object):
         self.data_preprocessor = data_prefix+preprocessor_suffix
         self.labels_preprocessor = labels_prefix+preprocessor_suffix
         self.tfidf, self.cv = self.get_preprocessors(calculate_preprocessors) if preprocessors is None else preprocessors
-        self.labels_distribution = np.load("distribution.npy")
-        self.labels_distribution_inverse = np.load("distribution_inverse.npy")
+        self.inverse_map = np.load("inverse_map.npy")
 
     def get_raw_data(self):
         X = CsvCleaner(self.raw_data_file, detector_mode=False,
@@ -86,20 +86,18 @@ class Dataset(object):
             x = self.tfidf.transform([tx])
             y = self.cv.transform([ty])
             _, true_labels = y.nonzero()
-            indices = self.labels_distribution
-            for label in np.sort(true_labels)[::-1]:
-                indices = np.delete(indices, slice(self.labels_distribution_inverse[label],
-                                    self.labels_distribution_inverse[label+1]))
-	    random_labels = np.random.randint(len(indices), size=self.unbalance_amount-len(true_labels))
-            labels = np.concatenate((true_labels, indices[random_labels]))
+            transformed_labels = self.inverse_map[true_labels]
+            transformed_labels = transformed_labels[transformed_labels < self.classes]
+            labels = np.arange(self.classes)
             labels += offset
             data_to_add = np.concatenate((x.data, [1]), axis=0)
             new_data = np.repeat(data_to_add.reshape((1, len(data_to_add))), len(labels), axis=0)
             new_data = new_data.flatten()
             indptr_to_add = x.indptr[-1]+1
             new_indptr = np.arange((1+len(labels))*indptr_to_add, step=indptr_to_add)
-            targets = np.ones((len(labels), 1))
-            targets[len(true_labels):] = -1
+            targets = -np.ones((len(labels), 1))
+            if len(transformed_labels) != 0:
+                targets[transformed_labels] = 1
             labels = labels.reshape((len(labels), 1))
             new_indices = np.repeat(x.indices.reshape((1, len(x.indices))), len(labels), axis=0)
             new_indices = np.concatenate((new_indices, labels), axis=1)
@@ -107,19 +105,15 @@ class Dataset(object):
             yield (new_data, new_indices, new_indptr), targets
 
 
-
-
 if __name__ == "__main__":
     actual_time = time.time()
-    tags_per_example = 500
-    unbalance = (True, tags_per_example)
-    training_dataset = Dataset(calculate_preprocessors=False, end=3500000, unbalance=unbalance)
+    classes = 10
+    training_dataset = Dataset(calculate_preprocessors=False, end=3500000, classes=classes)
     new_time = time.time()
     print "Time spent in building the tfidf and cv: "+str(new_time-actual_time)
-    validation_dataset = Dataset(calculate_preprocessors=False, unbalance=unbalance,
+    validation_dataset = Dataset(calculate_preprocessors=False,
                                  preprocessors=(training_dataset.tfidf, training_dataset.cv),
-                                 start=3500000, end=3502000)
+                                 start=3500000, end=3502000, classes=classes)
     lt = LogisticTrainer(training_dataset, validation_dataset,
-                         len(training_dataset.tfidf.vocabulary_)+len(training_dataset.cv.vocabulary_),
-                         tags_per_example)
+                         len(training_dataset.tfidf.vocabulary_)+len(training_dataset.cv.vocabulary_))
     lt.run()

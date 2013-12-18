@@ -85,7 +85,8 @@ class LogisticTrainer(object):
 
             #img = tile_raster_images(fe.parameters['in_to_hidden'].T, image_dims, feature_dims, (1, 1))
             #save_and_display(img, 'filters-%i.png' % i)
-
-            np.save("params"+time.strftime("%Y%m%d-%H%M%S"), info['best_pars'])
+            if (i % 50) == 0:
+                print "Saving params"
+                np.save("params"+time.strftime("%Y%m%d-%H%M%S"), info['best_pars'])
             row = '%i' % i, '%.6f' % (1-info['val_loss']), '%.6f' % m.parameters['bias']#, '%.6f' % info['step_length']
             print '   '.join(i.ljust(max_len) for i in row)
