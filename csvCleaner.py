@@ -30,10 +30,8 @@ class CsvCleaner:
 
         self.tags_to_remove = [(re.compile("&lt;"), "<"), (re.compile("&gt;"), ">"), (re.compile("<.*?>"), ""),
                                (re.compile("\[.*?\]"), ""), #(re.compile("\(.*?\)"), ""),
-                               (re.compile("\{.*?\}"), ""), (re.compile("[^a-z0-9]"), " "),
+                               (re.compile("\{.*?\}"), ""), (re.compile("[^a-z0-9#+-]"), " "),
                                (re.compile(" [0-9 ]* "), self.spell_numbers)]
-
-
 
     def spell_numbers(self, matchobj):
         final_obj = matchobj.group(0)

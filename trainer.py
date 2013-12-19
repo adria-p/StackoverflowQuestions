@@ -1,4 +1,5 @@
 from itertools import izip
+from multiprocessing import Pool
 from logisiticTrainer import LogisticTrainer
 
 __author__ = 'kosklain'
@@ -84,28 +85,29 @@ class Dataset(object):
             targets = np.array([[1]]) if self.word_to_find in ty else np.array([[-1]])
             yield (x.data, x.indices, x.indptr), targets
 
+
+def process(class_num):
+    training_dataset = Dataset(calculate_preprocessors=False, end=3500000, class_num=class_num,
+                   preprocessors=(tfidf, cv))
+    new_time = time.time()
+    print "Time spent in building the tfidf and cv: "+str(new_time-actual_time)
+    print "Creating model for word... "+ training_dataset.word_to_find
+    validation_dataset = Dataset(calculate_preprocessors=False,
+                                 preprocessors=(tfidf, cv),
+                                 start=3500000, end=3502000, class_num=class_num)
+    lt = LogisticTrainer(training_dataset, validation_dataset,
+                         len(tfidf.vocabulary_), class_num)
+    lt.run()
+
 if __name__ == "__main__":
     actual_time = time.time()
-    class_num = 0
-    first = True
-    tfidf = None
-    cv = None
+    current_class_num = 0
+    training_dataset = Dataset(calculate_preprocessors=False, end=3500000, class_num=current_class_num)
+    tfidf = training_dataset.tfidf
+    cv = training_dataset.cv
+    batch_size = 8
     while True:
-	if first:
-		training_dataset = Dataset(calculate_preprocessors=False, end=3500000, class_num=class_num)
-        	tfidf = training_dataset.tfidf
-		cv = training_dataset.cv
-		first = False
-	else:
-		training_dataset = Dataset(calculate_preprocessors=False, end=3500000, class_num=class_num,
-					   preprocessors=(tfidf, cv))
-	new_time = time.time()
-        print "Time spent in building the tfidf and cv: "+str(new_time-actual_time)
-        print "Creating model for word... "+ training_dataset.word_to_find
-        validation_dataset = Dataset(calculate_preprocessors=False,
-                                     preprocessors=(tfidf, cv),
-                                     start=3500000, end=3502000, class_num=class_num)
-        lt = LogisticTrainer(training_dataset, validation_dataset,
-                             len(tfidf.vocabulary_), class_num)
-        lt.run()
-        class_num += 1
+            classes_to_process = range(current_class_num, current_class_num+batch_size)
+            pool = Pool(processes=4)
+            pool.map(process, classes_to_process)
+            current_class_num += batch_size
