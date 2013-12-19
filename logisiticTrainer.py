@@ -43,9 +43,9 @@ class LogisticTrainer(object):
         return VX, VZ
 
     def run(self):
-        num_examples = 2000
+        num_examples = 1000
         batch_size = num_examples
-        max_iter = 500
+        max_iter = 700
         actual_time = time.time()
         new_time = time.time()
         print "Time spent in transforming the training dataset: "+str(new_time-actual_time)
@@ -59,7 +59,7 @@ class LogisticTrainer(object):
             climin.stops.after_n_iterations(max_iter),
             ])
         pause = climin.stops.modulo_n_iterations(10)
-        optimizer = 'rmsprop', {'steprate': 0.1, 'momenum': 0.9, 'decay': 0.9, 'step_adapt': 0.01} #0.01
+        optimizer = 'rmsprop', {'steprate': 0.01, 'momentum': 0.9, 'decay': 0.9, 'step_adapt': 0.001} #0.01
         m = GeneralizedLinearSparseModel(self.feature_size, 1, out_transfer='sigmoid', loss='fmeasure',
                                          optimizer=optimizer, batch_size=batch_size, max_iter=max_iter,
                                          num_examples=num_examples)
@@ -68,7 +68,7 @@ class LogisticTrainer(object):
         weight_decay = ((m.parameters.in_to_out ** 2).sum())# + (m.parameters.bias**2).sum())
         weight_decay /= m.exprs['inpt'].shape[0]
         m.exprs['true_loss'] = m.exprs['loss']
-        c_wd = 0.01
+        c_wd = 0.001
         m.exprs['loss'] = m.exprs['loss'] + c_wd * weight_decay
 
         # Set up a nice printout.

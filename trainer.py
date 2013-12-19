@@ -87,15 +87,25 @@ class Dataset(object):
 if __name__ == "__main__":
     actual_time = time.time()
     class_num = 0
+    first = True
+    tfidf = None
+    cv = None
     while True:
-        training_dataset = Dataset(calculate_preprocessors=False, end=3500000, class_num=class_num)
-        new_time = time.time()
+	if first:
+		training_dataset = Dataset(calculate_preprocessors=False, end=3500000, class_num=class_num)
+        	tfidf = training_dataset.tfidf
+		cv = training_dataset.cv
+		first = False
+	else:
+		training_dataset = Dataset(calculate_preprocessors=False, end=3500000, class_num=class_num,
+					   preprocessors=(tfidf, cv))
+	new_time = time.time()
         print "Time spent in building the tfidf and cv: "+str(new_time-actual_time)
-        print "Creating model with word... "+ training_dataset.word_to_find
+        print "Creating model for word... "+ training_dataset.word_to_find
         validation_dataset = Dataset(calculate_preprocessors=False,
-                                     preprocessors=(training_dataset.tfidf, training_dataset.cv),
+                                     preprocessors=(tfidf, cv),
                                      start=3500000, end=3502000, class_num=class_num)
         lt = LogisticTrainer(training_dataset, validation_dataset,
-                             len(training_dataset.tfidf.vocabulary_), class_num)
+                             len(tfidf.vocabulary_), class_num)
         lt.run()
         class_num += 1
