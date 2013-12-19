@@ -10,7 +10,7 @@ import time
 __author__ = 'apuigdom'
 
 
-def predict_tags(data_to_predict):
+def predict_tags(data_to_predict, csv_writer):
     data, indices, indptr = data_to_predict
     TX = csr_matrix((data, indices, indptr),
                 shape=(num_tags, feature_size),
@@ -18,10 +18,8 @@ def predict_tags(data_to_predict):
     predictions = np.array(m.predict(TX)).reshape(num_tags)
     selected_tags = tags[predictions > 0.5]
     selected_tags = " ".join(selected_tags)
-    print " "
-    print selected_tags
-    print " "
-    return selected_tags
+    csv_writer.writerow([selected_tags])
+
 
 class TestDataset(Dataset):
     def __init__(self, raw_data_file="Test.csv", preprocessors=None, classes=10):
@@ -58,14 +56,14 @@ if __name__ == "__main__":
     actual_time = time.time()
     testing_dataset = TestDataset(classes=classes_to_choose)
 
-    num_tags = len(testing_dataset.cv.vocabulary_)
+    num_tags = classes_to_choose
 
     new_time = time.time()
     print "Time spent in building the tfidf and cv: "+str(new_time-actual_time)
 
-    feature_size = len(testing_dataset.tfidf.vocabulary_) + len(testing_dataset.cv.vocabulary_)
+    feature_size = len(testing_dataset.tfidf.vocabulary_) + classes_to_choose
 
-    parameters_file = "params20131218-093927.npy"
+    parameters_file = "params20131218-235105.npy"
 
     num_examples = 200
     batch_size = num_examples*num_tags
@@ -93,7 +91,7 @@ if __name__ == "__main__":
     csv_submission.writerow(["Tags"])
 
     tags = np.array(testing_dataset.cv.get_feature_names())
-    tags = tags[testing_dataset.inverse_map]
+    tags = tags[testing_dataset.inverse_map.argsort()]
 
-    result = [[i] for x in testing_dataset for i in predict_tags(x)]
-    csv_submission.writerows(result)
+    for x in testing_dataset:
+	predict_tags(x, csv_submission)

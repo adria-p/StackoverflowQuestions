@@ -106,7 +106,7 @@ class Dataset(object):
 
 if __name__ == "__main__":
     actual_time = time.time()
-    classes = 10
+    classes = 1
     training_dataset = Dataset(calculate_preprocessors=False, end=3500000, classes=classes)
     new_time = time.time()
     print "Time spent in building the tfidf and cv: "+str(new_time-actual_time)
