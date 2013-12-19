@@ -3,15 +3,11 @@ from logisiticTrainer import LogisticTrainer
 
 __author__ = 'kosklain'
 
-from neuralTrainer import NeuralTrainer
-from sklearn.linear_model import SGDClassifier, LogisticRegression
 from csvCleaner import CsvCleaner
 from sklearn.feature_extraction.text import TfidfVectorizer, CountVectorizer
 from sklearn.externals import joblib
-import cPickle
 import string
 import numpy as np
-from scipy.sparse import csr_matrix, vstack
 import time
 
 
@@ -19,10 +15,10 @@ class Dataset(object):
     def __init__(self, stage=0, preprocessor_suffix="preprocess.pkl",
                  raw_data_file="Train_clean2.csv", start=0, end=30000,
                  calculate_preprocessors=True,
-                 unbalance=(True, 50), preprocessors = None, classes=10):
+                 unbalance=(True, 50), preprocessors = None, class_num=0):
         self.stage = stage
         self.start = start
-        self.classes = classes
+        self.class_num = class_num
         self.end = end
         self.raw_data_file = raw_data_file
         self.preprocessor_suffix = preprocessor_suffix
@@ -33,6 +29,8 @@ class Dataset(object):
         self.labels_preprocessor = labels_prefix+preprocessor_suffix
         self.tfidf, self.cv = self.get_preprocessors(calculate_preprocessors) if preprocessors is None else preprocessors
         self.inverse_map = np.load("inverse_map.npy")
+        tags = np.array(self.cv.get_feature_names())
+        self.word_to_find = tags[self.inverse_map.argsort()][self.class_num]
 
     def get_raw_data(self):
         X = CsvCleaner(self.raw_data_file, detector_mode=False,
@@ -81,38 +79,23 @@ class Dataset(object):
 
     def __iter__(self):
         X, Y = self.get_raw_data()
-        offset = len(self.tfidf.vocabulary_)
         for tx, ty in izip(X, Y):
             x = self.tfidf.transform([tx])
-            y = self.cv.transform([ty])
-            _, true_labels = y.nonzero()
-            transformed_labels = self.inverse_map[true_labels]
-            transformed_labels = transformed_labels[transformed_labels < self.classes]
-            labels = np.arange(offset, offset+self.classes)
-            data_to_add = np.concatenate((x.data, [1]), axis=0)
-            new_data = np.repeat(data_to_add.reshape((1, len(data_to_add))), len(labels), axis=0)
-            new_data = new_data.flatten()
-            indptr_to_add = x.indptr[-1]+1
-            new_indptr = np.arange((1+len(labels))*indptr_to_add, step=indptr_to_add)
-            targets = -np.ones((len(labels), 1))
-            if len(transformed_labels) != 0:
-                targets[transformed_labels] = 1
-            labels = labels.reshape((len(labels), 1))
-            new_indices = np.repeat(x.indices.reshape((1, len(x.indices))), len(labels), axis=0)
-            new_indices = np.concatenate((new_indices, labels), axis=1)
-            new_indices = new_indices.flatten()
-            yield (new_data, new_indices, new_indptr), targets
-
+            targets = np.array([[1]]) if self.word_to_find in ty else np.array([[-1]])
+            yield (x.data, x.indices, x.indptr), targets
 
 if __name__ == "__main__":
     actual_time = time.time()
-    classes = 1
-    training_dataset = Dataset(calculate_preprocessors=False, end=3500000, classes=classes)
-    new_time = time.time()
-    print "Time spent in building the tfidf and cv: "+str(new_time-actual_time)
-    validation_dataset = Dataset(calculate_preprocessors=False,
-                                 preprocessors=(training_dataset.tfidf, training_dataset.cv),
-                                 start=3500000, end=3502000, classes=classes)
-    lt = LogisticTrainer(training_dataset, validation_dataset,
-                         len(training_dataset.tfidf.vocabulary_) + classes, classes)
-    lt.run()
+    class_num = 0
+    while True:
+        training_dataset = Dataset(calculate_preprocessors=False, end=3500000, class_num=class_num)
+        new_time = time.time()
+        print "Time spent in building the tfidf and cv: "+str(new_time-actual_time)
+        print "Creating model with word... "+ training_dataset.word_to_find
+        validation_dataset = Dataset(calculate_preprocessors=False,
+                                     preprocessors=(training_dataset.tfidf, training_dataset.cv),
+                                     start=3500000, end=3502000, class_num=class_num)
+        lt = LogisticTrainer(training_dataset, validation_dataset,
+                             len(training_dataset.tfidf.vocabulary_), class_num)
+        lt.run()
+        class_num += 1

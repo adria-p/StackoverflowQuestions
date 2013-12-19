@@ -11,11 +11,11 @@ __author__ = 'kosklain'
 
 class LogisticTrainer(object):
 
-    def __init__(self, fit_data, eval_data, feature_size, tags_per_example):
+    def __init__(self, fit_data, eval_data, feature_size, class_num):
         self.fit_data = fit_data
         self.eval_data = eval_data
         self.feature_size = feature_size
-        self.tags_per_example = tags_per_example
+        self.class_num = class_num
 
     def get_validation_data(self):
         indices_VX = []
@@ -44,8 +44,8 @@ class LogisticTrainer(object):
 
     def run(self):
         num_examples = 2000
-        batch_size = num_examples*self.tags_per_example
-        max_iter = 300000
+        batch_size = num_examples
+        max_iter = 500
         actual_time = time.time()
         new_time = time.time()
         print "Time spent in transforming the training dataset: "+str(new_time-actual_time)
@@ -71,22 +71,21 @@ class LogisticTrainer(object):
         c_wd = 0.01
         m.exprs['loss'] = m.exprs['loss'] + c_wd * weight_decay
 
-
         # Set up a nice printout.
         keys = '#', 'val loss', 'bias'#, 'step_length'
         max_len = max(len(i) for i in keys)
         header = '   '.join(i.ljust(max_len) for i in keys)
         print header
         print '-' * len(header)
-
-
+        bp = None
         for i, info in enumerate(m.powerfit(self.fit_data, (VX, VZ), stop, pause)):
             v_losses.append(info['val_loss'])
-
             #img = tile_raster_images(fe.parameters['in_to_hidden'].T, image_dims, feature_dims, (1, 1))
             #save_and_display(img, 'filters-%i.png' % i)
             if (i % 50) == 0:
                 print "Saving params"
-                np.save("params"+time.strftime("%Y%m%d-%H%M%S"), info['best_pars'])
+                np.save("class"+str(self.class_num)+"-params"+time.strftime("%Y%m%d-%H%M%S"), info['best_pars'])
+            bp = info['best_pars']
             row = '%i' % i, '%.6f' % (1-info['val_loss']), '%.6f' % m.parameters['bias']#, '%.6f' % info['step_length']
             print '   '.join(i.ljust(max_len) for i in row)
+        np.save("class"+str(self.class_num), bp)
