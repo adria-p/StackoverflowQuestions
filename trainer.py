@@ -82,7 +82,7 @@ class Dataset(object):
         X, Y = self.get_raw_data()
         for tx, ty in izip(X, Y):
             x = self.tfidf.transform([tx])
-            targets = np.array([[1]]) if self.word_to_find in ty else np.array([[-1]])
+            targets = np.array([[1]]) if self.word_to_find in ty.split() else np.array([[-1]])
             yield (x.data, x.indices, x.indptr), targets
 
 
@@ -101,11 +101,11 @@ def process(class_num):
 
 if __name__ == "__main__":
     actual_time = time.time()
-    current_class_num = 0
+    current_class_num = 144
     training_dataset = Dataset(calculate_preprocessors=False, end=3500000, class_num=current_class_num)
     tfidf = training_dataset.tfidf
     cv = training_dataset.cv
-    batch_size = 8
+    batch_size = 16
     while True:
             classes_to_process = range(current_class_num, current_class_num+batch_size)
             pool = Pool(processes=4)

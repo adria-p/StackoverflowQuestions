@@ -9,7 +9,7 @@ __author__ = 'apuigdom'
 
 
 def predict_tags(data_to_predict, csv_writer, words, models):
-    predictions = [m.predict(data_to_predict)[0][0] for m in models]
+    predictions = np.array([m.predict(data_to_predict)[0][0] for m in models])
     selected_tags = " ".join(words[predictions > 0.5])
     csv_writer.writerow([selected_tags])
 
@@ -21,6 +21,8 @@ class TestDataset(Dataset):
                                           preprocessors=preprocessors, class_num=class_num)
         tags = np.array(self.cv.get_feature_names())
         self.words = tags[self.inverse_map.argsort()]
+	print self.words
+	np.save("words", self.words)
 
     def get_raw_data(self):
         X = CsvCleaner(self.raw_data_file, detector_mode=False,
@@ -57,7 +59,7 @@ def generate_model(class_num):
     return m
 
 if __name__ == "__main__":
-    classes_to_choose = 20
+    classes_to_choose = 50
     actual_time = time.time()
     testing_dataset = TestDataset()
     new_time = time.time()
