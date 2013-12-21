@@ -1,37 +1,41 @@
 from itertools import izip
 from multiprocessing import Pool
-from logisiticTrainer import LogisticTrainer
-
-__author__ = 'kosklain'
-
-from csvCleaner import CsvCleaner
+from trainers.logisiticTrainer import LogisticTrainer
+from preprocessing.csvCleaner import CsvCleaner
 from sklearn.feature_extraction.text import TfidfVectorizer, CountVectorizer
 from sklearn.externals import joblib
 import string
 import numpy as np
 import time
-
+import os
 
 class Dataset(object):
     def __init__(self, stage=0, preprocessor_suffix="preprocess.pkl",
                  raw_data_file="Train_clean2.csv", start=0, end=30000,
                  calculate_preprocessors=True,
                  unbalance=(True, 50), preprocessors = None, class_num=0):
+
+        models_folder = "models"
+        data_folder = "data"
         self.stage = stage
         self.start = start
         self.class_num = class_num
         self.end = end
-        self.raw_data_file = raw_data_file
+        self.raw_data_file = os.path.join(data_folder, raw_data_file)
         self.preprocessor_suffix = preprocessor_suffix
         self.fixed_unbalance, self.unbalance_amount = unbalance
         data_prefix = "data_"
         labels_prefix = "labels_"
-        self.data_preprocessor = data_prefix+preprocessor_suffix
+        self.data_preprocessor = os.path.join(models_folder, data_prefix+preprocessor_suffix)
         self.labels_preprocessor = labels_prefix+preprocessor_suffix
-        self.tfidf, self.cv = self.get_preprocessors(calculate_preprocessors) if preprocessors is None else preprocessors
-        self.inverse_map = np.load("inverse_map.npy")
+        if preprocessors is None:
+            self.tfidf, self.cv = self.get_preprocessors(calculate_preprocessors)
+        else:
+            self.tfidf, self.cv = preprocessors
+        self.inverse_map = np.load(os.path.join(models_folder, "inverse_map.npy"))
         tags = np.array(self.cv.get_feature_names())
         self.word_to_find = tags[self.inverse_map.argsort()][self.class_num]
+        self.projection_size = 4000
 
     def get_raw_data(self):
         X = CsvCleaner(self.raw_data_file, detector_mode=False,
@@ -54,28 +58,17 @@ class Dataset(object):
         joblib.dump(cv, self.labels_preprocessor)
         return tfidf, cv
 
-    def shuffle_sparse_matrices(self, start, stop, matrix1, matrix2):
-        indices = np.arange(start, stop, dtype=np.int32)
-        np.random.shuffle(indices)
-        return matrix1[indices, :], matrix2[indices]
-
-    def get_sliced_shuffled_data(self, X, Z):
-        train_end = round(self.fractions[0]*X.shape[0])
-        new_X, new_Z = self.shuffle_sparse_matrices(0, train_end, X, Z)
-        VX, VZ = self.shuffle_sparse_matrices(train_end, X.shape[0], X, Z)
-        return new_X, VX, new_Z, VZ
-
     def get_projection_matrix(self, in_dim, out_dim):
         # Probaiblity of  {-1,1} is 1/sqrt(in_dim)
-        probability = 2*np.sqrt(in_dim)
         np.random.seed(15)
+        probability = 2*np.sqrt(in_dim)
         P = np.random.randint(probability, size=(in_dim*out_dim)).reshape((in_dim, out_dim))
         P[P > 2] = 1
         P -= 1
         return P
 
     def get_projected_data(self, X):
-        P = self.get_projection_matrix(X.shape[1], 4000)
+        P = self.get_projection_matrix(X.shape[1], self.projection_size)
         return X.dot(P)
 
     def __iter__(self):
@@ -101,7 +94,7 @@ def process(class_num):
 
 if __name__ == "__main__":
     actual_time = time.time()
-    current_class_num = 144
+    current_class_num = 0
     training_dataset = Dataset(calculate_preprocessors=False, end=3500000, class_num=current_class_num)
     tfidf = training_dataset.tfidf
     cv = training_dataset.cv

@@ -1,10 +1,12 @@
-import climin
 import itertools
 import time
-from tangMlp import TangMlp, squared_hinge
-import theano.tensor as T
+
+import climin
 import climin.initialize
 import climin.stops
+
+from trainers.tangMlp import TangMlp, squared_hinge
+
 
 __author__ = 'kosklain'
 
@@ -27,9 +29,6 @@ class NeuralTrainer(object):
         noise_schedule = itertools.chain(noise_schedule, itertools.repeat(0))
 
         optimizer = 'rmsprop', {'steprate': 0.001, 'momentum': 0.9, 'decay': 0.9, 'step_adapt': 0.01}
-        #optimizer = 'gd', {'steprate': climin.schedule.linear_annealing(0.1, 0, max_iter),
-        # 'momentum': 0.5, 'momentum_type': 'nesterov'}
-        #optimizer = dropout_optimizer_conf(steprate_0=1, n_repeats=1)
 
         m = TangMlp(self.X.shape[1], [4000], 1, hidden_transfers=['sigmoid'],
                     out_transfer='identity', loss=squared_hinge, noise_schedule=noise_schedule,
@@ -38,8 +37,6 @@ class NeuralTrainer(object):
         m.parameters['out_bias'][...] = 0
 
         weight_decay = ((m.parameters.hidden_to_out ** 2).sum())
-        #                + (m.parameters.hidden_to_hidden_0**2).sum()
-        #                + (m.parameters.hidden_to_out**2).sum())
         weight_decay /= m.exprs['inpt'].shape[0]
         m.exprs['true_loss'] = m.exprs['loss']
         c_wd = 0.001
@@ -59,9 +56,6 @@ class NeuralTrainer(object):
         header = '\t'.join(i for i in keys)
         print header
         print '-' * len(header)
-
-        #f_loss = m.function(['inpt', 'target'], ['true_loss', 'loss'])
-
 
         stop = climin.stops.any_([
             climin.stops.after_n_iterations(max_iter),

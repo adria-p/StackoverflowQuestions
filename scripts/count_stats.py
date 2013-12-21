@@ -1,5 +1,7 @@
-from csvCleaner import CsvCleaner
 from collections import Counter
+import os
+from preprocessing.csvCleaner import CsvCleaner
+
 __author__ = 'apuigdom'
 
 
@@ -30,19 +32,15 @@ class StatCounter(object):
         words_x = [word for x in X for word in x.split()]
         print "Result for training text from %d to %d:" % (start, end)
         print Counter(words_x).most_common(1000)
-        del(words_x)
         words_y = [word for y in Y for word in y.split()]
         print "Result for training tags from %d to %d:" % (start, end)
         print Counter(words_y).most_common(1000)
-        del(words_y)
 
     def check_testing_stats(self, start, end):
         X, _ = self.get_raw_data(start, end)
         words_x = [word for x in X for word in x.split()]
         print "Result for testing text from %d to %d:" % (start, end)
-        print Counter(words_x).most_common(1000)
-        pass
 
 if __name__ == "__main__":
-    sc = StatCounter("Test.csv")
+    sc = StatCounter(os.path.join('data', 'Test.csv'))
     sc.check_stats(5, training=False)

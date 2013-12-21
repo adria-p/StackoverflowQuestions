@@ -1,6 +1,8 @@
 from sklearn.externals import joblib
-from csvCleaner import CsvCleaner
 import numpy as np
+import os
+from preprocessing.csvCleaner import CsvCleaner
+
 
 __author__ = 'kosklain'
 
@@ -31,11 +33,12 @@ class DistributionCounter(object):
 
 
 if __name__ == "__main__":
+    models_folder = 'models'
     dc = DistributionCounter()
     final_array = [i for x in dc for i in x]
     final_array = np.array(final_array)
     final_array = np.sort(final_array)
-    np.save("distribution", final_array)
+    np.save(os.path.join(models_folder, "distribution"), final_array)
     dist_inverse = [0]
     current = final_array[0]
     for i, x in enumerate(final_array):
@@ -44,9 +47,9 @@ if __name__ == "__main__":
             dist_inverse.append(i)
     dist_inverse.append(len(final_array))
     dist_inverse = np.array(dist_inverse)
-    np.save("distribution_inverse", dist_inverse)
+    np.save(os.path.join(models_folder, "distribution_inverse"), dist_inverse)
     dist_diff = np.diff(dist_inverse)
     sorted_diff = np.argsort(dist_diff)
     sorted_diff = sorted_diff[::-1]
     final_map = np.argsort(sorted_diff)
-    np.save("inverse_map", final_map)
+    np.save(os.path.join(models_folder, "inverse_map"), final_map)

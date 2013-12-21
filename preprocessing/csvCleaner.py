@@ -2,6 +2,7 @@
 __author__ = 'apuigdom'
 import csv
 import re
+import os
 
 class CsvCleaner:
     def __init__(self, csv_file, start=0, end=-1, detector_mode=False, report_every=0,
@@ -55,8 +56,6 @@ class CsvCleaner:
                 final_string = final_string[:trim]+ final_string[-trim:]
             final_string = " ".join(final_string)
         return final_string
-
-
 
     def process(self, text):
         p_list = self.p.findall(text)
@@ -120,10 +119,10 @@ class CsvCleaner:
                 if self.end_reading != -1:
                     break
             if self.repeated_test is not None:
-		if self.number_test != len(self.repeated_test):
-                	if self.repeated_test[self.number_test] == (i-1):
-                    		self.number_test += 1
-                    		continue
+                if self.number_test != len(self.repeated_test):
+                    if self.repeated_test[self.number_test] == (i-1):
+                        self.number_test += 1
+                        continue
             if self.testing:
                 [_, title, body] = line
             else:
@@ -133,7 +132,7 @@ class CsvCleaner:
             if not self.only_tags:
                 processed_body = self.process(body)
             if self.detector_mode:
-                self.detect(title, body, processed_body, tags.split(" "))
+                self.detect(title, body, processed_body, tags.split(' '))
             if not self.only_tags:
                 yield " ".join((title+" "+processed_body).split())
             else:
@@ -152,6 +151,6 @@ class LineCounter(object):
         return counter
 
 if __name__ == "__main__":
-    lc = LineCounter("Train.csv")
+    lc = LineCounter(os.path.join('data', 'Train.csv'))
     print lc.count_lines()
 

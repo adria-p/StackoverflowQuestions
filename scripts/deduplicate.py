@@ -1,12 +1,12 @@
 import csv
 import numpy as np
-import sys
+import os
 from multiprocessing import Pool
 import pandas as pd
 
 def check_testing_repeated():
     print "Starting to store titles"
-    csv_reader_train = csv.reader(open("Train.csv"))
+    csv_reader_train = csv.reader(open(os.path.join('data', 'Train.csv')))
     next(csv_reader_train)
     train_titles = [line[1] for line in csv_reader_train]
 
@@ -31,13 +31,17 @@ def check_testing_repeated():
     final_index_array_test = np.array([element[0] for element in result if element != None])
     final_index_array_train = np.array([element[1] for element in result if element != None])
     print "Done, %d out of %d" % (len(final_index_array_test), len(result))
-    np.save("repeated_test", final_index_array_test)
-    np.save("repeated_train", final_index_array_train)
+    models_folder = 'models'
+    np.save(os.path.join(models_folder,"repeated_test"), final_index_array_test)
+    np.save(os.path.join(models_folder,"repeated_train"), final_index_array_train)
 
 def check_train_repeated():
-    train = pd.read_csv("Train.csv", index_col=0)
+    data_folder = 'data'
+    train = pd.read_csv(os.path.join(data_folder,"Train.csv"), index_col=0)
     train_deduplicated = train.drop_duplicates(cols="Title")
-    train_deduplicated.to_csv("Train_clean2.csv", index="Id", quoting=csv.QUOTE_NONNUMERIC)
+    train_deduplicated.to_csv(os.path.join(data_folder,"Train_clean2.csv"),
+                              index="Id", quoting=csv.QUOTE_NONNUMERIC)
 
-
-check_train_repeated()
+if __name__ == '__main__':
+    check_train_repeated()
+    check_testing_repeated()

@@ -1,9 +1,13 @@
 import csv
-from brummlearn.glm import GeneralizedLinearSparseModel
-from csvCleaner import CsvCleaner
-from trainer import Dataset
-import numpy as np
 import time
+import os
+
+from brummlearn.glm import GeneralizedLinearSparseModel
+import numpy as np
+
+from preprocessing.csvCleaner import CsvCleaner
+from trainer import Dataset
+
 
 __author__ = 'apuigdom'
 
@@ -21,26 +25,24 @@ class TestDataset(Dataset):
                                           preprocessors=preprocessors, class_num=class_num)
         tags = np.array(self.cv.get_feature_names())
         self.words = tags[self.inverse_map.argsort()]
-	print self.words
-	np.save("words", self.words)
+        np.save("words", self.words)
 
     def get_raw_data(self):
+        repeated_test_file = os.path.join('models', 'repeated_test.npy')
         X = CsvCleaner(self.raw_data_file, detector_mode=False,
                        report_every=10000, start=self.start,
                        end=self.end, only_tags=False, testing=True,
-                       repeated_test=np.load("repeated_test.npy"))
+                       repeated_test=np.load(repeated_test_file))
         return X
 
     def __iter__(self):
         TX = self.get_raw_data()
-        offset = len(self.tfidf.vocabulary_)
         for tx in TX:
             x = self.tfidf.transform([tx])
             yield x
 
-
-
 def generate_model(class_num):
+    models_folder = "models"
     optimizer = 'rmsprop', {'steprate': 0.0001, 'momentum': 0.9, 'decay': 0.9, 'step_adapt': False} #0.01
     feature_size = len(testing_dataset.tfidf.vocabulary_)
     num_examples = 200
@@ -49,17 +51,19 @@ def generate_model(class_num):
     m = GeneralizedLinearSparseModel(feature_size, 1, out_transfer='sigmoid', loss='fmeasure',
                                      optimizer=optimizer, batch_size=batch_size, max_iter=max_iter,
                                      num_examples=num_examples)
-    weight_decay = ((m.parameters.in_to_out ** 2).sum())# + (m.parameters.bias**2).sum())
+    weight_decay = ((m.parameters.in_to_out ** 2).sum())
     weight_decay /= m.exprs['inpt'].shape[0]
     m.exprs['true_loss'] = m.exprs['loss']
     c_wd = 0.001
-    m.exprs['loss'] = m.exprs['loss'] + c_wd * weight_decay
-    parameters_file = "class"+str(class_num)+".npy"
+    m.exprs['loss'] += c_wd * weight_decay
+    parameters_file = os.path.join(models_folder, "class%d.npy" % class_num)
     m.parameters.data = np.load(parameters_file)
     return m
 
 if __name__ == "__main__":
     classes_to_choose = 50
+    data_folder = "data"
+    submission_file = os.path.join(data_folder, "presubmission.csv")
     actual_time = time.time()
     testing_dataset = TestDataset()
     new_time = time.time()
@@ -71,7 +75,7 @@ if __name__ == "__main__":
     actual_time = new_time
     new_time = time.time()
     print "Time spent in transforming the validation dataset: "+str(new_time-actual_time)
-    csv_submission = csv.writer(open("submission-1.csv", "w"), quoting=csv.QUOTE_NONNUMERIC)
+    csv_submission = csv.writer(open(submission_file, "w"), quoting=csv.QUOTE_NONNUMERIC)
     csv_submission.writerow(["Tags"])
     for x in testing_dataset:
         predict_tags(x, csv_submission, testing_dataset.words, models)

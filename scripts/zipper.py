@@ -1,17 +1,24 @@
 __author__ = 'apuigdom'
 import csv
 import numpy as np
+import os
+
+data_folder = 'data'
+models_folder = 'models'
+submission = os.path.join(data_folder, 'submission.csv')
+presubmission = os.path.join(data_folder, 'presubmission.csv')
+original_train = os.path.join(data_folder, 'Train.csv')
 
 
-csv_writer = csv.writer(open("submission2.csv", "w"), quoting=csv.QUOTE_NONNUMERIC)
-csv_reader_submission = csv.reader(open("submission-1.csv"))
-csv_reader_train = csv.reader(open("Train.csv"))
+csv_writer = csv.writer(open(submission, 'w'), quoting=csv.QUOTE_NONNUMERIC)
+csv_reader_submission = csv.reader(open(presubmission))
+csv_reader_train = csv.reader(open(original_train))
 next(csv_reader_train)
 next(csv_reader_submission)
 csv_writer.writerow(["Id", "Tags"])
 
-repeated_train = np.load("repeated_train.npy")
-repeated_test = np.load("repeated_test.npy")
+repeated_train = np.load(os.path.join(models_folder, "repeated_train.npy"))
+repeated_test = np.load(os.path.join(models_folder, "repeated_test.npy"))
 test_index = 0
 answer_num = 0
 offset = 6034196
