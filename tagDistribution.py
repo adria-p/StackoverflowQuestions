@@ -45,3 +45,8 @@ if __name__ == "__main__":
     dist_inverse.append(len(final_array))
     dist_inverse = np.array(dist_inverse)
     np.save("distribution_inverse", dist_inverse)
+    dist_diff = np.diff(dist_inverse)
+    sorted_diff = np.argsort(dist_diff)
+    sorted_diff = sorted_diff[::-1]
+    final_map = np.argsort(sorted_diff)
+    np.save("inverse_map", final_map)

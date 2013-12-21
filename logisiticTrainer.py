@@ -11,11 +11,11 @@ __author__ = 'kosklain'
 
 class LogisticTrainer(object):
 
-    def __init__(self, fit_data, eval_data, feature_size, tags_per_example):
+    def __init__(self, fit_data, eval_data, feature_size, class_num):
         self.fit_data = fit_data
         self.eval_data = eval_data
         self.feature_size = feature_size
-        self.tags_per_example = tags_per_example
+        self.class_num = class_num
 
     def get_validation_data(self):
         indices_VX = []
@@ -43,9 +43,9 @@ class LogisticTrainer(object):
         return VX, VZ
 
     def run(self):
-        num_examples = 400
-        batch_size = num_examples*self.tags_per_example
-        max_iter = 300000
+        num_examples = 1000
+        batch_size = num_examples
+        max_iter = 700
         actual_time = time.time()
         new_time = time.time()
         print "Time spent in transforming the training dataset: "+str(new_time-actual_time)
@@ -59,7 +59,7 @@ class LogisticTrainer(object):
             climin.stops.after_n_iterations(max_iter),
             ])
         pause = climin.stops.modulo_n_iterations(10)
-        optimizer = 'rmsprop', {'steprate': 0.1, 'momenum': 0.9, 'decay': 0.9, 'step_adapt': 0.01} #0.01
+        optimizer = 'rmsprop', {'steprate': 0.01, 'momentum': 0.9, 'decay': 0.9, 'step_adapt': 0.001} #0.01
         m = GeneralizedLinearSparseModel(self.feature_size, 1, out_transfer='sigmoid', loss='fmeasure',
                                          optimizer=optimizer, batch_size=batch_size, max_iter=max_iter,
                                          num_examples=num_examples)
@@ -68,9 +68,8 @@ class LogisticTrainer(object):
         weight_decay = ((m.parameters.in_to_out ** 2).sum())# + (m.parameters.bias**2).sum())
         weight_decay /= m.exprs['inpt'].shape[0]
         m.exprs['true_loss'] = m.exprs['loss']
-        c_wd = 0.01
+        c_wd = 0.001
         m.exprs['loss'] = m.exprs['loss'] + c_wd * weight_decay
-
 
         # Set up a nice printout.
         keys = '#', 'val loss', 'bias'#, 'step_length'
@@ -78,14 +77,10 @@ class LogisticTrainer(object):
         header = '   '.join(i.ljust(max_len) for i in keys)
         print header
         print '-' * len(header)
-
-
+        bp = None
         for i, info in enumerate(m.powerfit(self.fit_data, (VX, VZ), stop, pause)):
             v_losses.append(info['val_loss'])
-
-            #img = tile_raster_images(fe.parameters['in_to_hidden'].T, image_dims, feature_dims, (1, 1))
-            #save_and_display(img, 'filters-%i.png' % i)
-
-            np.save("params"+time.strftime("%Y%m%d-%H%M%S"), info['best_pars'])
+            bp = info['best_pars']
             row = '%i' % i, '%.6f' % (1-info['val_loss']), '%.6f' % m.parameters['bias']#, '%.6f' % info['step_length']
             print '   '.join(i.ljust(max_len) for i in row)
+        np.save("class"+str(self.class_num), bp)

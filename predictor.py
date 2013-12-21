@@ -1,7 +1,5 @@
 import csv
-from multiprocessing import Pool
 from brummlearn.glm import GeneralizedLinearSparseModel
-from scipy.sparse import csr_matrix, vstack
 from csvCleaner import CsvCleaner
 from trainer import Dataset
 import numpy as np
@@ -10,24 +8,21 @@ import time
 __author__ = 'apuigdom'
 
 
-def predict_tags(data_to_predict):
-    data, indices, indptr = data_to_predict
-    TX = csr_matrix((data, indices, indptr),
-                shape=(num_tags, feature_size),
-                dtype=np.float64)
-    predictions = np.array(m.predict(TX)).reshape(num_tags)
-    selected_tags = tags[predictions > 0.95]
-    selected_tags = " ".join(selected_tags)
-    print " "
-    print selected_tags
-    print " "
-    return selected_tags
+def predict_tags(data_to_predict, csv_writer, words, models):
+    predictions = np.array([m.predict(data_to_predict)[0][0] for m in models])
+    selected_tags = " ".join(words[predictions > 0.5])
+    csv_writer.writerow([selected_tags])
+
 
 class TestDataset(Dataset):
-    def __init__(self, raw_data_file="Test.csv", preprocessors=None):
+    def __init__(self, raw_data_file="Test.csv", preprocessors=None, class_num=10):
         super(TestDataset, self).__init__(raw_data_file=raw_data_file, end=-1,
                                           calculate_preprocessors=False,
-                                          preprocessors=preprocessors)
+                                          preprocessors=preprocessors, class_num=class_num)
+        tags = np.array(self.cv.get_feature_names())
+        self.words = tags[self.inverse_map.argsort()]
+	print self.words
+	np.save("words", self.words)
 
     def get_raw_data(self):
         X = CsvCleaner(self.raw_data_file, detector_mode=False,
@@ -38,46 +33,19 @@ class TestDataset(Dataset):
 
     def __iter__(self):
         TX = self.get_raw_data()
-        num_tags = len(self.cv.vocabulary_)
         offset = len(self.tfidf.vocabulary_)
         for tx in TX:
             x = self.tfidf.transform([tx])
-            labels = np.arange(offset, offset+num_tags)
-            data_to_add = np.concatenate((x.data, [1]), axis=0)
-            new_data = np.repeat(data_to_add.reshape((1, len(data_to_add))), len(labels), axis=0)
-            new_data = new_data.flatten()
-            indptr_to_add = x.indptr[-1]+1
-            new_indptr = np.arange((1+len(labels))*indptr_to_add, step=indptr_to_add)
-            labels = labels.reshape((len(labels), 1))
-            new_indices = np.repeat(x.indices.reshape((1, len(x.indices))), len(labels), axis=0)
-            new_indices = np.concatenate((new_indices, labels), axis=1)
-            new_indices = new_indices.flatten()
-            yield new_data, new_indices, new_indptr
+            yield x
 
-if __name__ == "__main__":
-    actual_time = time.time()
-    testing_dataset = TestDataset()
 
-    num_tags = len(testing_dataset.cv.vocabulary_)
 
-    new_time = time.time()
-    print "Time spent in building the tfidf and cv: "+str(new_time-actual_time)
-
-    feature_size = len(testing_dataset.tfidf.vocabulary_) + len(testing_dataset.cv.vocabulary_)
-
-    parameters_file = "params20131218-093927.npy"
-
-    num_examples = 200
-    batch_size = num_examples*num_tags
-    max_iter = 3000
-    actual_time = time.time()
-    new_time = time.time()
-    print "Time spent in transforming the training dataset: "+str(new_time-actual_time)
-    actual_time = new_time
-    new_time = time.time()
-    print "Time spent in transforming the validation dataset: "+str(new_time-actual_time)
+def generate_model(class_num):
     optimizer = 'rmsprop', {'steprate': 0.0001, 'momentum': 0.9, 'decay': 0.9, 'step_adapt': False} #0.01
-
+    feature_size = len(testing_dataset.tfidf.vocabulary_)
+    num_examples = 200
+    batch_size = num_examples
+    max_iter = 3000
     m = GeneralizedLinearSparseModel(feature_size, 1, out_transfer='sigmoid', loss='fmeasure',
                                      optimizer=optimizer, batch_size=batch_size, max_iter=max_iter,
                                      num_examples=num_examples)
@@ -86,13 +54,24 @@ if __name__ == "__main__":
     m.exprs['true_loss'] = m.exprs['loss']
     c_wd = 0.001
     m.exprs['loss'] = m.exprs['loss'] + c_wd * weight_decay
-
+    parameters_file = "class"+str(class_num)+".npy"
     m.parameters.data = np.load(parameters_file)
+    return m
 
-    csv_submission = csv.writer(open("submission.csv", "w"), quoting=csv.QUOTE_NONNUMERIC)
+if __name__ == "__main__":
+    classes_to_choose = 50
+    actual_time = time.time()
+    testing_dataset = TestDataset()
+    new_time = time.time()
+    print "Time spent in building the tfidf and cv: "+str(new_time-actual_time)
+    models = [generate_model(class_num) for class_num in range(classes_to_choose)]
+    actual_time = time.time()
+    new_time = time.time()
+    print "Time spent in transforming the training dataset: "+str(new_time-actual_time)
+    actual_time = new_time
+    new_time = time.time()
+    print "Time spent in transforming the validation dataset: "+str(new_time-actual_time)
+    csv_submission = csv.writer(open("submission-1.csv", "w"), quoting=csv.QUOTE_NONNUMERIC)
     csv_submission.writerow(["Tags"])
-
-    tags = np.array(testing_dataset.cv.get_feature_names())
-
-    result = [[i] for x in testing_dataset for i in predict_tags(x)]
-    csv_submission.writerows(result)
+    for x in testing_dataset:
+        predict_tags(x, csv_submission, testing_dataset.words, models)

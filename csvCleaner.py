@@ -30,10 +30,8 @@ class CsvCleaner:
 
         self.tags_to_remove = [(re.compile("&lt;"), "<"), (re.compile("&gt;"), ">"), (re.compile("<.*?>"), ""),
                                (re.compile("\[.*?\]"), ""), #(re.compile("\(.*?\)"), ""),
-                               (re.compile("\{.*?\}"), ""), (re.compile("[^a-z0-9]"), " "),
+                               (re.compile("\{.*?\}"), ""), (re.compile("[^a-z0-9#+-]"), " "),
                                (re.compile(" [0-9 ]* "), self.spell_numbers)]
-
-
 
     def spell_numbers(self, matchobj):
         final_obj = matchobj.group(0)
@@ -122,9 +120,10 @@ class CsvCleaner:
                 if self.end_reading != -1:
                     break
             if self.repeated_test is not None:
-                if self.repeated_test[self.number_test] == (i-1):
-                    self.number_test += 1
-                    continue
+		if self.number_test != len(self.repeated_test):
+                	if self.repeated_test[self.number_test] == (i-1):
+                    		self.number_test += 1
+                    		continue
             if self.testing:
                 [_, title, body] = line
             else:
@@ -136,7 +135,7 @@ class CsvCleaner:
             if self.detector_mode:
                 self.detect(title, body, processed_body, tags.split(" "))
             if not self.only_tags:
-                yield " ".join((title+processed_body).split())
+                yield " ".join((title+" "+processed_body).split())
             else:
                 yield tags
 
