@@ -5,6 +5,10 @@ import re
 import os
 
 class CsvCleaner:
+    """
+        Defines the regex needed to filter all the initial titles and body structures in the
+        data sets.
+    """
     def __init__(self, csv_file, start=0, end=-1, detector_mode=False, report_every=0,
                  only_tags=False, testing=False, repeated_test=None):
         self.csv = csv_file
@@ -140,6 +144,10 @@ class CsvCleaner:
 
 
 class LineCounter(object):
+    """
+        Counts the number of examples in the data set
+    """
+
     def __init__(self, csv_file):
         self.csv = csv_file
     def count_lines(self):

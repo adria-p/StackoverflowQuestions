@@ -6,6 +6,11 @@ __author__ = 'apuigdom'
 
 
 class StatCounter(object):
+    """
+        Checks the top words in the body of questions, as well
+        as the top tags. It is done in several segments, just
+        to see if the training data set is not shuffled.
+    """
     def __init__(self, raw_data_file):
         self.raw_data_file = raw_data_file
 

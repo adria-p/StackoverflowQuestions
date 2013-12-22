@@ -8,8 +8,14 @@ import string
 import numpy as np
 import time
 import os
+import sys
 
 class Dataset(object):
+    """
+        General class that builds the tfidf and cv models,
+        and provides the tfidf transformation of every example.
+        To obtain Train_clean2.csv run deduplicate.csv
+    """
     def __init__(self, stage=0, preprocessor_suffix="preprocess.pkl",
                  raw_data_file="Train_clean2.csv", start=0, end=30000,
                  calculate_preprocessors=True,
@@ -32,6 +38,7 @@ class Dataset(object):
             self.tfidf, self.cv = self.get_preprocessors(calculate_preprocessors)
         else:
             self.tfidf, self.cv = preprocessors
+        # Need to run tagDistribution.py from scripts if file not present
         self.inverse_map = np.load(os.path.join(models_folder, "inverse_map.npy"))
         tags = np.array(self.cv.get_feature_names())
         self.word_to_find = tags[self.inverse_map.argsort()][self.class_num]
@@ -95,6 +102,9 @@ def process(class_num):
 if __name__ == "__main__":
     actual_time = time.time()
     current_class_num = 0
+    if len(sys.argv) > 1:
+        Dataset(calculate_preprocessors=True, end=3500000, class_num=current_class_num)
+        sys.exit(0)
     training_dataset = Dataset(calculate_preprocessors=False, end=3500000, class_num=current_class_num)
     tfidf = training_dataset.tfidf
     cv = training_dataset.cv

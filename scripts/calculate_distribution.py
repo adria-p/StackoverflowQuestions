@@ -8,6 +8,9 @@ __author__ = 'kosklain'
 
 
 class DistributionCounter(object):
+    """
+        Gets all the indices of the tags.
+    """
     def __init__(self, preprocessor_suffix="preprocess.pkl",
                  raw_data_file="Train_clean2.csv", start=0,
                  end=3500000):
@@ -26,7 +29,6 @@ class DistributionCounter(object):
 
     def __iter__(self):
         Y = self.get_raw_data()
-        levels = len(self.cv.vocabulary_)
         for ty in Y:
             y = self.cv.transform([ty])
             yield y.indices

@@ -19,6 +19,10 @@ def predict_tags(data_to_predict, csv_writer, words, models):
 
 
 class TestDataset(Dataset):
+    """
+        Testing dataset. It only provides the transformation of the title and body text
+        of the testing data.
+    """
     def __init__(self, raw_data_file="Test.csv", preprocessors=None, class_num=10):
         super(TestDataset, self).__init__(raw_data_file=raw_data_file, end=-1,
                                           calculate_preprocessors=False,
@@ -41,9 +45,10 @@ class TestDataset(Dataset):
             x = self.tfidf.transform([tx])
             yield x
 
+# Get the model for a certain tag
 def generate_model(class_num):
     models_folder = "models"
-    optimizer = 'rmsprop', {'steprate': 0.0001, 'momentum': 0.9, 'decay': 0.9, 'step_adapt': False} #0.01
+    optimizer = 'rmsprop', {'steprate': 0.0001, 'momentum': 0.9, 'decay': 0.9, 'step_adapt': False}
     feature_size = len(testing_dataset.tfidf.vocabulary_)
     num_examples = 200
     batch_size = num_examples

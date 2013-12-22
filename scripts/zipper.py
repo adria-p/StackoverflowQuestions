@@ -3,6 +3,8 @@ import csv
 import numpy as np
 import os
 
+# Zip the predictions with the 'already known' answers.
+
 data_folder = 'data'
 models_folder = 'models'
 submission = os.path.join(data_folder, 'submission.csv')
