@@ -1,7 +1,7 @@
-FacebookCompetition
+StackoverflowQuestions
 ===================
 
-Keyword extraction. More details about the competition on
+Keyword extraction. More details on
 http://www.kaggle.com/c/facebook-recruiting-iii-keyword-extraction
 
 How to use:
